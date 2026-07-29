@@ -6,7 +6,7 @@ const parser = new Parser();
 
 // あなたのアフィリエイトIDを入力
 const AFFILIATE_ID = 'yofukashireview'; 
-const RSS_URL = 'https://www.dlsite.com/maniax/rss/index.xml'; 
+const RSS_URL = 'https://www.dlsite.com/maniax/rss/'; 
 
 function addAffiliateTag(url, affId) {
   if (!url) return '#';
