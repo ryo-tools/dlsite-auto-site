@@ -1,0 +1,11 @@
+{
+  "name": "dlsite-auto-site",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/fetch-dlsite.js"
+  },
+  "dependencies": {
+    "rss-parser": "^3.13.0"
+  }
+}
