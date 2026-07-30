@@ -1,22 +1,26 @@
-import Parser from 'rss-parser';
 import fs from 'fs';
 import path from 'path';
 
-const parser = new Parser();
-
-// あなたのアフィリエイトIDを入力
+// --------------------------------------------------
+// 設定項目
+// --------------------------------------------------
+// あなたのアフィリエイトIDを入力してください
 const AFFILIATE_ID = 'yofukashireview'; 
-const RSS_URL = 'https://www.dlsite.com/maniax/rss/'; 
 
+// DLsite公式API（同人・ASMR・ボイス等の人気作品データJSON）
+const API_URL = 'https://www.dlsite.com/maniax/api/=/product/+/type/ranking/format/json';
+
+// --------------------------------------------------
+// ユーティリティ関数
+// --------------------------------------------------
 function addAffiliateTag(url, affId) {
   if (!url) return '#';
-  const cleanUrl = url.split('/link/')[0]; 
-  return `https://www.dlsite.com/maniax/dramat/=/aff_id/${affId}/url/${encodeURIComponent(cleanUrl)}`;
+  return `https://www.dlsite.com/maniax/dramat/=/aff_id/${affId}/url/${encodeURIComponent(url)}`;
 }
 
 function escapeHtml(str) {
   if (!str) return '';
-  return str
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -24,23 +28,34 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// --------------------------------------------------
+// メイン処理
+// --------------------------------------------------
 async function generateSite() {
   try {
-    console.log('Fetching RSS from DLsite...');
-    const feed = await parser.parseURL(RSS_URL);
+    console.log('Fetching data from DLsite API...');
+    const response = await fetch(API_URL);
+    if (!response.ok) {
+      throw new Error(`API response error: ${response.status}`);
+    }
     
-    const itemsHtml = feed.items.slice(0, 30).map(item => {
-      const affLink = addAffiliateTag(item.link, AFFILIATE_ID);
-      const title = escapeHtml(item.title);
-      const content = item.contentSnippet ? escapeHtml(item.contentSnippet.slice(0, 120)) + '...' : '';
-      const pubDate = item.pubDate ? new Date(item.pubDate).toLocaleDateString('ja-JP') : '';
+    const items = await response.json();
+    
+    const itemsHtml = items.slice(0, 30).map(item => {
+      const workUrl = `https://www.dlsite.com/maniax/work/=/product_id/${item.product_id}.html`;
+      const affLink = addAffiliateTag(workUrl, AFFILIATE_ID);
+      const title = escapeHtml(item.work_name);
+      const makerName = escapeHtml(item.maker_name);
+      const imgUrl = item.image_main ? `https:${item.image_main.url}` : '';
 
       return `
         <article class="card">
+          <div class="card-img">
+            ${imgUrl ? `<img src="${imgUrl}" alt="${title}" loading="lazy">` : ''}
+          </div>
           <div class="card-body">
-            <span class="date">${pubDate}</span>
+            <span class="maker">${makerName}</span>
             <h2 class="title"><a href="${affLink}" target="_blank" rel="nofollow noopener">${title}</a></h2>
-            <p class="description">${content}</p>
             <div class="action">
               <a href="${affLink}" target="_blank" rel="nofollow noopener" class="btn">作品詳細・試聴はこちら</a>
             </div>
