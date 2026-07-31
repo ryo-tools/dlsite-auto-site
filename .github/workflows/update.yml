@@ -39,4 +39,3 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: dlsite-auto-site
           directory: public
-          gitMetaDataUseCommitMessage: true
