@@ -8,74 +8,110 @@ const DOMAIN = 'https://dlsite-auto-site.pages.dev';
 async function fetchDLsiteData() {
   console.log('DLsiteデータ取得開始...');
   
-  const browser = await chromium.launch({ headless: true });
+  // Bot検知（AutomationControlled）を無効化して起動
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-blink-features=AutomationControlled'
+    ]
+  });
+
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     viewport: { width: 1280, height: 800 },
     locale: 'ja-JP'
   });
-  
+
   const page = await context.newPage();
 
-  // 年齢認証クッキーを設定
+  // navigator.webdriver を隠蔽して自動化検知を回避
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
+
+  // 年齢認証クッキーの設定
   await context.addCookies([
     { name: 'adultchecked', value: '1', domain: '.dlsite.com', path: '/' },
     { name: 'work_view_option', value: '1', domain: '.dlsite.com', path: '/' }
   ]);
 
   try {
+    console.log('ページへアクセス中...');
     await page.goto('https://www.dlsite.com/maniax/new', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.evaluate(() => window.scrollBy(0, 500));
-    await page.waitForTimeout(2000);
+    
+    // 作品要素が存在するまで最大15秒待機
+    console.log('要素の読み込みを待機中...');
+    await page.waitForSelector('.work_1col, .work_thumb_box, #work_src_list, dt.work_name', { timeout: 15000 }).catch(() => {
+      console.log('waitForSelector タイムアウト（継続して評価を試みます）');
+    });
+
+    // スクロールして画像をロード
+    await page.evaluate(() => window.scrollBy(0, 800));
+    await page.waitForTimeout(1500);
 
     const items = await page.evaluate((affiliateId) => {
-      const elements = document.querySelectorAll('table.work_1col tr, .work_thumb_box, .dl_list_item, dt.work_name');
       const list = [];
+      // DLsiteの作品リンクを広く探索
+      const titleLinks = document.querySelectorAll('.work_name a, .work_title a, dt.work_name a');
 
-      elements.forEach(el => {
-        const parent = el.closest('tr') || el.closest('.work_thumb_box') || el.parentElement;
-        if (!parent) return;
+      titleLinks.forEach(linkEl => {
+        const titleText = linkEl.innerText ? linkEl.innerText.trim() : '';
+        if (!titleText) return;
 
-        const titleEl = parent.querySelector('.work_name a, .work_title a, dt a');
-        const makerEl = parent.querySelector('.maker_name a, .author a, .maker a');
-        const imgEl = parent.querySelector('img');
-        const priceEl = parent.querySelector('.price, .work_price, .price_default');
+        let rawLink = linkEl.getAttribute('href') || '';
+        if (!rawLink) return;
 
-        if (titleEl) {
-          let link = titleEl.getAttribute('href') || titleEl.href || '';
-          if (!link) return;
+        // 絶対パスに正規化
+        if (rawLink.startsWith('/')) {
+          rawLink = 'https://www.dlsite.com' + rawLink;
+        } else if (!rawLink.startsWith('http')) {
+          rawLink = 'https://www.dlsite.com/' + rawLink;
+        }
 
-          // 絶対パス補正
-          if (link.startsWith('/')) {
-            link = 'https://www.dlsite.com' + link;
-          } else if (!link.startsWith('http')) {
-            link = 'https://www.dlsite.com/' + link;
-          }
+        const cleanLink = rawLink.split('?')[0];
+        const finalLink = `${cleanLink}?af_id=${affiliateId}`;
 
-          // アフィリエイトIDを付与
-          const cleanLink = link.split('?')[0];
-          link = `${cleanLink}?af_id=${affiliateId}`;
+        // 親要素を遡ってサークル名・価格・画像を囲むコンテナを取得
+        const container = linkEl.closest('tr') || linkEl.closest('.work_thumb_box') || linkEl.closest('li') || linkEl.parentElement.parentElement;
 
-          // 画像URLの取得
-          let imgUrl = '';
+        let maker = 'DLsite';
+        let price = '価格情報なし';
+        let imgUrl = '';
+
+        if (container) {
+          const makerEl = container.querySelector('.maker_name a, .author a, .maker a');
+          if (makerEl) maker = makerEl.innerText.trim();
+
+          const priceEl = container.querySelector('.price, .work_price, .price_default');
+          if (priceEl) price = priceEl.innerText.trim();
+
+          const imgEl = container.querySelector('img');
           if (imgEl) {
-            imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || imgEl.src || '';
-            if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
-          }
+            imgUrl = imgEl.getAttribute('data-src') || 
+                     imgEl.getAttribute('data-original') || 
+                     imgEl.getAttribute('src') || '';
 
-          const titleText = titleEl.innerText ? titleEl.innerText.trim() : '';
-
-          if (titleText && !list.some(i => i.link === link)) {
-            list.push({
-              title: titleText,
-              link: link,
-              maker: makerEl ? makerEl.innerText.trim() : 'DLsite',
-              image: imgUrl,
-              price: priceEl ? priceEl.innerText.trim() : '価格情報なし'
-            });
+            if (imgUrl.startsWith('//')) {
+              imgUrl = 'https:' + imgUrl;
+            } else if (imgUrl.startsWith('/')) {
+              imgUrl = 'https://www.dlsite.com' + imgUrl;
+            }
           }
         }
+
+        if (!list.some(i => i.link === finalLink)) {
+          list.push({
+            title: titleText,
+            link: finalLink,
+            maker: maker,
+            image: imgUrl,
+            price: price
+          });
+        }
       });
+
       return list;
     }, AFFILIATE_ID);
 
@@ -89,7 +125,7 @@ async function fetchDLsiteData() {
   }
 }
 
-// 初期状態のシンプル＆クリーンなデザインスタイル
+// 初期状態のスッキリした青系デザインスタイル
 const commonStyle = `
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f5f7fa; color: #333; margin: 0; padding: 0; line-height: 1.5; }
@@ -97,7 +133,7 @@ const commonStyle = `
   header h1 { margin: 0; font-size: 1.4rem; color: #1c2938; }
   nav.categories { background-color: #2b3846; padding: 10px; text-align: center; }
   nav.categories a { color: #ffffff; text-decoration: none; margin: 0 15px; font-weight: bold; font-size: 0.9rem; }
-  nav.categories a:hover { color: #40916c; text-decoration: underline; }
+  nav.categories a:hover { color: #1da1f2; text-decoration: underline; }
   .breadcrumb { max-width: 1200px; margin: 15px auto 0; padding: 0 20px; font-size: 0.85rem; color: #657786; }
   .breadcrumb a { color: #1da1f2; text-decoration: none; }
   .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
@@ -232,7 +268,7 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  console.log('ビルド完了: リファラー制御（no-referrer）を追加し、初期デザインに復元しました。');
+  console.log('ビルド完了: 正常にHTMLと画像URLを生成・保存しました。');
 }
 
 main();
