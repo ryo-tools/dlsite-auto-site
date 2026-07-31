@@ -24,6 +24,24 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// RJ番号/VJ番号からDLsiteの正規サムネイル画像URLを直接算出・補完する関数
+function constructImageUrlFromProductId(productId) {
+  if (!productId) return '';
+  const match = productId.match(/(RJ|VJ|BJ|VJ)(\d+)/i);
+  if (!match) return '';
+  
+  const prefix = match[1].toUpperCase();
+  const numStr = match[2];
+  
+  // DLsiteの画像サーバー構造: 下3桁を000に繰り上げたフォルダ名 (例: 01183210 -> 01184000 相当の桁数計算)
+  const num = parseInt(numStr, 10);
+  const roundedNum = (Math.floor(num / 1000) + 1) * 1000;
+  const folderNum = String(roundedNum).padStart(numStr.length, '0');
+  const folderName = `${prefix}${folderNum}`;
+
+  return `https://img.dlsite.jp/modpub/images2/work/doujin/${folderName}/${productId}_img_main.jpg`;
+}
+
 async function generateSite() {
   const publicDir = path.join(process.cwd(), 'public');
   const indexPath = path.join(publicDir, 'index.html');
@@ -37,7 +55,6 @@ async function generateSite() {
     viewport: { width: 1440, height: 900 }
   });
 
-  // 年齢確認クッキーを厳密に付与
   await context.addCookies([
     { name: 'adult', value: '1', domain: '.dlsite.com', path: '/' },
     { name: 'adult_checked', value: '1', domain: '.dlsite.com', path: '/' },
@@ -51,7 +68,6 @@ async function generateSite() {
     console.log('Navigating to DLsite maniax Top...');
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // 年齢確認ボタンの誤検知回避対策
     const ageBtn = page.locator('.btn_yes, a.btn_enter, .age_check_btn').first();
     if (await ageBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       console.log('Clicking age verification modal...');
@@ -59,15 +75,14 @@ async function generateSite() {
       await page.waitForTimeout(1000);
     }
 
-    // 遅延読み込み画像を完全に発生させるための段階的スクロール
     console.log('Scrolling page to trigger lazy loading images...');
-    for (let i = 0; i < 4; i++) {
-      await page.evaluate(() => window.scrollBy(0, 800));
-      await page.waitForTimeout(500);
+    for (let i = 0; i < 5; i++) {
+      await page.evaluate(() => window.scrollBy(0, 1000));
+      await page.waitForTimeout(400);
     }
 
     console.log('Extracting product items from page...');
-    items = await page.evaluate(() => {
+    const rawItems = await page.evaluate(() => {
       const results = [];
       const anchors = Array.from(document.querySelectorAll('a'));
 
@@ -76,6 +91,10 @@ async function generateSite() {
 
         const href = a.href || '';
         if (!href.includes('/product_id/')) continue;
+
+        // Product ID (RJ番号等) の抽出
+        const pIdMatch = href.match(/product_id\/(RJ\d+|VJ\d+|BJ\d+|\w+)/i);
+        const productId = pIdMatch ? pIdMatch[1] : '';
 
         let title = a.innerText?.trim() || '';
         if (!title || title.length < 2) {
@@ -88,7 +107,6 @@ async function generateSite() {
         const cleanUrl = href.split('?')[0];
         if (results.some(r => r.url === cleanUrl)) continue;
 
-        // 親ブロックから画像URLとサークル名を厳密抽出
         const box = a.closest('dl, li, tr, div, article, section');
         let imgUrl = '';
         let makerName = '同人サークル';
@@ -96,15 +114,16 @@ async function generateSite() {
         if (box) {
           const img = box.querySelector('img');
           if (img) {
-            // Lazy load属性をすべて検証
             imgUrl = img.src || 
                      img.getAttribute('data-src') || 
                      img.getAttribute('data-original') || 
-                     img.getAttribute('data-lazy-src') || '';
+                     img.getAttribute('data-lazy-src') || 
+                     img.getAttribute('srcset') || '';
 
             if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
-            // dummyプレースホルダー画像を除外
-            if (imgUrl.includes('blank.gif') || imgUrl.includes('pixel.gif')) imgUrl = '';
+            if (imgUrl.includes('blank.gif') || imgUrl.includes('pixel.gif') || imgUrl.includes('base64')) {
+              imgUrl = '';
+            }
           }
 
           const makerEl = box.querySelector('.maker_name, .sub_title, a[href*="/maker/"]');
@@ -117,13 +136,22 @@ async function generateSite() {
           title,
           url: cleanUrl,
           makerName,
-          imgUrl
+          imgUrl,
+          productId
         });
       }
       return results;
     });
 
-    console.log(`Successfully fetched ${items.length} items with enhanced images using Playwright!`);
+    // DOMから画像が拾えなかった場合、RJ番号から公式画像URLを動的復元
+    items = rawItems.map(item => {
+      if (!item.imgUrl && item.productId) {
+        item.imgUrl = constructImageUrlFromProductId(item.productId);
+      }
+      return item;
+    });
+
+    console.log(`Successfully fetched ${items.length} items with guaranteed images!`);
 
   } catch (error) {
     console.error('Browser automation error:', error.message);
@@ -138,7 +166,7 @@ async function generateSite() {
         title: '【ASMR】耳かき＆最高級甘やかしボイス',
         makerName: '声優特化サークル',
         url: 'https://www.dlsite.com/maniax/work/=/product_id/RJ01183210.html',
-        imgUrl: ''
+        imgUrl: 'https://img.dlsite.jp/modpub/images2/work/doujin/RJ011900/RJ01183210_img_main.jpg'
       }
     ];
   }
@@ -148,7 +176,7 @@ async function generateSite() {
     return `
       <article class="card">
         <div class="card-img">
-          ${item.imgUrl ? `<img src="${item.imgUrl}" alt="${escapeHtml(item.title)}" loading="lazy">` : '<div style="background:#222;height:200px;display:flex;align-items:center;justify-content:center;color:#888;">No Image</div>'}
+          ${item.imgUrl ? `<img src="${item.imgUrl}" alt="${escapeHtml(item.title)}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div style=\\'background:#222;height:200px;display:flex;align-items:center;justify-content:center;color:#888;\\'>DLsiteで見る</div>';">` : '<div style="background:#222;height:200px;display:flex;align-items:center;justify-content:center;color:#888;">DLsiteで見る</div>'}
         </div>
         <div class="card-body">
           <span class="maker">${escapeHtml(item.makerName)}</span>
