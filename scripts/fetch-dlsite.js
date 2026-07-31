@@ -37,11 +37,7 @@ async function fetchDLsiteData() {
   try {
     console.log('ページへアクセス中...');
     await page.goto('https://www.dlsite.com/maniax/new', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    
-    await page.waitForSelector('.work_1col, .work_thumb_box, #work_src_list, dt.work_name', { timeout: 15000 }).catch(() => {});
-
-    await page.evaluate(() => window.scrollBy(0, 800));
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
 
     const items = await page.evaluate((affiliateId) => {
       const list = [];
@@ -63,11 +59,32 @@ async function fetchDLsiteData() {
         const cleanLink = rawLink.split('?')[0];
         const finalLink = `${cleanLink}?af_id=${affiliateId}`;
 
+        // RJ品番（例: RJ01234567 または RJ123456）をURLから抽出
+        const rjMatch = cleanLink.match(/(RJ[0-9]+)/i);
+        let imgUrl = '';
+
+        if (rjMatch) {
+          const rjCode = rjMatch[1].toUpperCase();
+          
+          // DLsiteの公式画像ディレクトリ法則に従ってURLを直接組み立てる
+          // 桁数に応じたディレクトリ階層の計算
+          let folder = '';
+          const digits = rjCode.replace('RJ', '');
+          if (digits.length >= 8) {
+            folder = rjCode.substring(0, 5) + '000'; // 例: RJ01234567 -> RJ01234000
+          } else {
+            const num = parseInt(digits, 10);
+            const rounded = Math.floor(num / 1000) * 1000;
+            folder = 'RJ' + String(rounded).padStart(digits.length, '0');
+          }
+
+          imgUrl = `https://img.dlsite.jp/modpub/images2/work/doujin/${folder}/${rjCode}_img_main.jpg`;
+        }
+
         const container = linkEl.closest('tr') || linkEl.closest('.work_thumb_box') || linkEl.closest('li') || linkEl.parentElement.parentElement;
 
         let maker = 'DLsite';
         let price = '価格情報なし';
-        let imgUrl = '';
 
         if (container) {
           const makerEl = container.querySelector('.maker_name a, .author a, .maker a');
@@ -76,26 +93,12 @@ async function fetchDLsiteData() {
           const priceEl = container.querySelector('.price, .work_price, .price_default');
           if (priceEl) price = priceEl.innerText.trim();
 
-          // 画像URLの取得（imgタグ / 属性 / background-image対応）
-          const imgEl = container.querySelector('img, [data-src], [style*="background"]');
-          if (imgEl) {
-            imgUrl = imgEl.getAttribute('data-src') || 
-                     imgEl.getAttribute('data-original') || 
-                     imgEl.getAttribute('src') || '';
-
-            // imgタグの属性で取れなかった場合、styleのbackground-imageをパース
-            if (!imgUrl) {
-              const style = imgEl.getAttribute('style') || '';
-              const bgMatch = style.match(/url\(['"]?(.*?)['"]?\)/);
-              if (bgMatch && bgMatch[1]) {
-                imgUrl = bgMatch[1];
-              }
-            }
-
-            if (imgUrl.startsWith('//')) {
-              imgUrl = 'https:' + imgUrl;
-            } else if (imgUrl.startsWith('/')) {
-              imgUrl = 'https://www.dlsite.com' + imgUrl;
+          // 万が一RJ品番で生成できなかった場合のフォールバック（HTML内の画像取得）
+          if (!imgUrl) {
+            const imgEl = container.querySelector('img');
+            if (imgEl) {
+              imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
+              if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
             }
           }
         }
@@ -105,7 +108,7 @@ async function fetchDLsiteData() {
             title: titleText,
             link: finalLink,
             maker: maker,
-            image: imgUrl,
+            image: imgUrl || 'https://www.dlsite.com/images/web/common/no_image/no_image_200x200.gif',
             price: price
           });
         }
@@ -124,7 +127,7 @@ async function fetchDLsiteData() {
   }
 }
 
-// 初期状態のスッキリした青系デザインスタイル
+// 初期状態のクリーンな青系デザインスタイル
 const commonStyle = `
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f5f7fa; color: #333; margin: 0; padding: 0; line-height: 1.5; }
@@ -267,7 +270,7 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  console.log('ビルド完了: 背景画像・属性を含めた画像URLの取得処理を更新しました。');
+  console.log('ビルド完了: RJ品番からの画像URL自動生成ロジックを反映しました。');
 }
 
 main();
