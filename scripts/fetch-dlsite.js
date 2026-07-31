@@ -59,22 +59,24 @@ async function fetchDLsiteData() {
         const cleanLink = rawLink.split('?')[0];
         const finalLink = `${cleanLink}?af_id=${affiliateId}`;
 
-        // RJ品番（例: RJ01234567 または RJ123456）をURLから抽出
+        // RJ品番（例: RJ01234567 または RJ123456）を抽出
         const rjMatch = cleanLink.match(/(RJ[0-9]+)/i);
         let imgUrl = '';
 
         if (rjMatch) {
           const rjCode = rjMatch[1].toUpperCase();
-          
-          // DLsiteの公式画像ディレクトリ法則に従ってURLを直接組み立てる
-          // 桁数に応じたディレクトリ階層の計算
-          let folder = '';
           const digits = rjCode.replace('RJ', '');
+          let folder = '';
+
           if (digits.length >= 8) {
-            folder = rjCode.substring(0, 5) + '000'; // 例: RJ01234567 -> RJ01234000
-          } else {
+            // 8桁の場合（例: RJ01001234 -> RJ01002000）
             const num = parseInt(digits, 10);
-            const rounded = Math.floor(num / 1000) * 1000;
+            const rounded = Math.ceil(num / 1000) * 1000;
+            folder = 'RJ' + String(rounded).padStart(digits.length, '0');
+          } else {
+            // 6桁の場合（例: RJ123456 -> RJ124000）
+            const num = parseInt(digits, 10);
+            const rounded = Math.ceil(num / 1000) * 1000;
             folder = 'RJ' + String(rounded).padStart(digits.length, '0');
           }
 
@@ -92,15 +94,6 @@ async function fetchDLsiteData() {
 
           const priceEl = container.querySelector('.price, .work_price, .price_default');
           if (priceEl) price = priceEl.innerText.trim();
-
-          // 万が一RJ品番で生成できなかった場合のフォールバック（HTML内の画像取得）
-          if (!imgUrl) {
-            const imgEl = container.querySelector('img');
-            if (imgEl) {
-              imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
-              if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
-            }
-          }
         }
 
         if (!list.some(i => i.link === finalLink)) {
@@ -127,7 +120,7 @@ async function fetchDLsiteData() {
   }
 }
 
-// 初期状態のクリーンな青系デザインスタイル
+// 初期状態の青系デザインスタイル
 const commonStyle = `
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f5f7fa; color: #333; margin: 0; padding: 0; line-height: 1.5; }
@@ -164,6 +157,7 @@ function generateHTML(title, description, items, breadcrumbs) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
   <title>${title}</title>
   <meta name="description" content="${description}">
   <style>${commonStyle}</style>
@@ -270,7 +264,7 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  console.log('ビルド完了: RJ品番からの画像URL自動生成ロジックを反映しました。');
+  console.log('ビルド完了: <meta name="referrer" content="no-referrer"> を追加し直リンクブロックを修正しました。');
 }
 
 main();
