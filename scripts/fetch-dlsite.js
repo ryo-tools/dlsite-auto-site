@@ -8,7 +8,6 @@ const DOMAIN = 'https://dlsite-auto-site.pages.dev';
 async function fetchDLsiteData() {
   console.log('DLsiteデータ取得開始...');
   
-  // Bot検知（AutomationControlled）を無効化して起動
   const browser = await chromium.launch({
     headless: true,
     args: [
@@ -26,12 +25,10 @@ async function fetchDLsiteData() {
 
   const page = await context.newPage();
 
-  // navigator.webdriver を隠蔽して自動化検知を回避
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
   });
 
-  // 年齢認証クッキーの設定
   await context.addCookies([
     { name: 'adultchecked', value: '1', domain: '.dlsite.com', path: '/' },
     { name: 'work_view_option', value: '1', domain: '.dlsite.com', path: '/' }
@@ -41,19 +38,13 @@ async function fetchDLsiteData() {
     console.log('ページへアクセス中...');
     await page.goto('https://www.dlsite.com/maniax/new', { waitUntil: 'domcontentloaded', timeout: 60000 });
     
-    // 作品要素が存在するまで最大15秒待機
-    console.log('要素の読み込みを待機中...');
-    await page.waitForSelector('.work_1col, .work_thumb_box, #work_src_list, dt.work_name', { timeout: 15000 }).catch(() => {
-      console.log('waitForSelector タイムアウト（継続して評価を試みます）');
-    });
+    await page.waitForSelector('.work_1col, .work_thumb_box, #work_src_list, dt.work_name', { timeout: 15000 }).catch(() => {});
 
-    // スクロールして画像をロード
     await page.evaluate(() => window.scrollBy(0, 800));
     await page.waitForTimeout(1500);
 
     const items = await page.evaluate((affiliateId) => {
       const list = [];
-      // DLsiteの作品リンクを広く探索
       const titleLinks = document.querySelectorAll('.work_name a, .work_title a, dt.work_name a');
 
       titleLinks.forEach(linkEl => {
@@ -63,7 +54,6 @@ async function fetchDLsiteData() {
         let rawLink = linkEl.getAttribute('href') || '';
         if (!rawLink) return;
 
-        // 絶対パスに正規化
         if (rawLink.startsWith('/')) {
           rawLink = 'https://www.dlsite.com' + rawLink;
         } else if (!rawLink.startsWith('http')) {
@@ -73,7 +63,6 @@ async function fetchDLsiteData() {
         const cleanLink = rawLink.split('?')[0];
         const finalLink = `${cleanLink}?af_id=${affiliateId}`;
 
-        // 親要素を遡ってサークル名・価格・画像を囲むコンテナを取得
         const container = linkEl.closest('tr') || linkEl.closest('.work_thumb_box') || linkEl.closest('li') || linkEl.parentElement.parentElement;
 
         let maker = 'DLsite';
@@ -87,11 +76,21 @@ async function fetchDLsiteData() {
           const priceEl = container.querySelector('.price, .work_price, .price_default');
           if (priceEl) price = priceEl.innerText.trim();
 
-          const imgEl = container.querySelector('img');
+          // 画像URLの取得（imgタグ / 属性 / background-image対応）
+          const imgEl = container.querySelector('img, [data-src], [style*="background"]');
           if (imgEl) {
             imgUrl = imgEl.getAttribute('data-src') || 
                      imgEl.getAttribute('data-original') || 
                      imgEl.getAttribute('src') || '';
+
+            // imgタグの属性で取れなかった場合、styleのbackground-imageをパース
+            if (!imgUrl) {
+              const style = imgEl.getAttribute('style') || '';
+              const bgMatch = style.match(/url\(['"]?(.*?)['"]?\)/);
+              if (bgMatch && bgMatch[1]) {
+                imgUrl = bgMatch[1];
+              }
+            }
 
             if (imgUrl.startsWith('//')) {
               imgUrl = 'https:' + imgUrl;
@@ -268,7 +267,7 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  console.log('ビルド完了: 正常にHTMLと画像URLを生成・保存しました。');
+  console.log('ビルド完了: 背景画像・属性を含めた画像URLの取得処理を更新しました。');
 }
 
 main();
