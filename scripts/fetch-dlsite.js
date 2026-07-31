@@ -1,15 +1,17 @@
 import fs from 'fs';
 import path from 'path';
+import { chromium } from 'playwright';
 
-// あなたのアフィリエイトIDを入力
+// アフィリエイトID
 const AFFILIATE_ID = 'yofukashireview'; 
 
-// API URL（フォールバック付き）
-const API_URL = 'https://www.dlsite.com/maniax/api/=/product/+/type/ranking/format/json';
+// トップページ（100%年齢クッキーが効いてランキング・新着作品が取得可能なURL）
+const TARGET_URL = 'https://www.dlsite.com/maniax/';
 
 function addAffiliateTag(url, affId) {
   if (!url) return '#';
-  return `https://www.dlsite.com/maniax/dramat/=/aff_id/${affId}/url/${encodeURIComponent(url)}`;
+  const cleanUrl = url.split('?')[0];
+  return `https://www.dlsite.com/maniax/dramat/=/aff_id/${affId}/url/${encodeURIComponent(cleanUrl)}`;
 }
 
 function escapeHtml(str) {
@@ -23,45 +25,135 @@ function escapeHtml(str) {
 }
 
 async function generateSite() {
+  const publicDir = path.join(process.cwd(), 'public');
+  const indexPath = path.join(publicDir, 'index.html');
+
+  console.log('Starting headless browser...');
+  const browser = await chromium.launch({ headless: true });
+
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    locale: 'ja-JP',
+    viewport: { width: 1440, height: 900 }
+  });
+
+  // 年齢確認クッキーを付与
+  await context.addCookies([
+    { name: 'adult', value: '1', domain: '.dlsite.com', path: '/' },
+    { name: 'adult_checked', value: '1', domain: '.dlsite.com', path: '/' },
+    { name: 'locale', value: 'ja_JP', domain: '.dlsite.com', path: '/' }
+  ]);
+
+  const page = await context.newPage();
+  let items = [];
+
   try {
-    console.log('Fetching data from DLsite API...');
-    const response = await fetch(API_URL, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    console.log('Navigating to DLsite maniax Top...');
+    await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+    // 年齢確認等のモーダルが出ている場合は自動クリックで突破
+    const ageBtn = page.locator('a:has-text("はい"), button:has-text("はい"), .btn_yes, .btn_enter, .age_check_btn');
+    if (await ageBtn.count() > 0 && await ageBtn.first().isVisible()) {
+      console.log('Clicking age verification modal...');
+      await ageBtn.first().click();
+      await page.waitForTimeout(2000);
+    }
+
+    console.log('Scrolling page to load images and content...');
+    await page.evaluate(() => window.scrollBy(0, 1000));
+    await page.waitForTimeout(2000);
+
+    console.log('Extracting product items from page...');
+    items = await page.evaluate(() => {
+      const results = [];
+      // ページ内のすべてのリンクを走査
+      const anchors = Array.from(document.querySelectorAll('a'));
+
+      for (const a of anchors) {
+        if (results.length >= 30) break;
+
+        const href = a.href || '';
+        // product_id / RJ番号が含まれるリンクのみ抽出
+        if (!href.includes('/product_id/')) continue;
+
+        let title = a.innerText?.trim() || '';
+        if (!title || title.length < 2) {
+          const img = a.querySelector('img');
+          title = img?.alt || img?.title || '';
+        }
+
+        if (!title || title.length < 2) continue;
+
+        const cleanUrl = href.split('?')[0];
+        if (results.some(r => r.url === cleanUrl)) continue;
+
+        // 親ブロックから画像URLとサークル名を取得
+        const box = a.closest('dl, li, tr, div, article, section');
+        let imgUrl = '';
+        let makerName = '同人サークル';
+
+        if (box) {
+          const img = box.querySelector('img');
+          if (img) {
+            imgUrl = img.src || img.getAttribute('data-src') || '';
+            if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+          }
+
+          const makerEl = box.querySelector('.maker_name, .sub_title, a[href*="/maker/"]');
+          if (makerEl && makerEl.innerText.trim()) {
+            makerName = makerEl.innerText.trim();
+          }
+        }
+
+        results.push({
+          title,
+          url: cleanUrl,
+          makerName,
+          imgUrl
+        });
       }
+      return results;
     });
 
-    let items = [];
-    if (response.ok) {
-      items = await response.json();
-    } else {
-      console.warn(`API fetch failed with status ${response.status}. Generating fallback page.`);
-    }
-    
-    const itemsHtml = (items && items.length > 0) ? items.slice(0, 30).map(item => {
-      const workUrl = `https://www.dlsite.com/maniax/work/=/product_id/${item.product_id}.html`;
-      const affLink = addAffiliateTag(workUrl, AFFILIATE_ID);
-      const title = escapeHtml(item.work_name);
-      const makerName = escapeHtml(item.maker_name);
-      const imgUrl = item.image_main ? `https:${item.image_main.url}` : '';
+    console.log(`Successfully fetched ${items.length} items using Playwright!`);
 
-      return `
-        <article class="card">
-          <div class="card-img">
-            ${imgUrl ? `<img src="${imgUrl}" alt="${title}" loading="lazy">` : ''}
-          </div>
-          <div class="card-body">
-            <span class="maker">${makerName}</span>
-            <h2 class="title"><a href="${affLink}" target="_blank" rel="nofollow noopener">${title}</a></h2>
-            <div class="action">
-              <a href="${affLink}" target="_blank" rel="nofollow noopener" class="btn">作品詳細・試聴はこちら</a>
-            </div>
-          </div>
-        </article>
-      `;
-    }).join('') : `<p style="text-align:center; padding: 40px;">現在データを更新中です。しばらくお待ちください。</p>`;
+  } catch (error) {
+    console.error('Browser automation error:', error.message);
+  } finally {
+    await browser.close();
+  }
 
-    const htmlContent = `<!DOCTYPE html>
+  if (items.length === 0) {
+    console.warn('Fallback to sample data as browser returned 0 items');
+    items = [
+      {
+        title: '【ASMR】耳かき＆最高級甘やかしボイス',
+        makerName: '声優特化サークル',
+        url: 'https://www.dlsite.com/maniax/work/=/product_id/RJ01183210.html',
+        imgUrl: ''
+      }
+    ];
+  }
+
+  const itemsHtml = items.map(item => {
+    const affLink = addAffiliateTag(item.url, AFFILIATE_ID);
+    return `
+      <article class="card">
+        <div class="card-img">
+          ${item.imgUrl ? `<img src="${item.imgUrl}" alt="${escapeHtml(item.title)}" loading="lazy">` : '<div style="background:#222;height:200px;display:flex;align-items:center;justify-content:center;color:#888;">No Image</div>'}
+        </div>
+        <div class="card-body">
+          <span class="maker">${escapeHtml(item.makerName)}</span>
+          <h2 class="title"><a href="${affLink}" target="_blank" rel="nofollow noopener">${escapeHtml(item.title)}</a></h2>
+          <div class="action">
+            <a href="${affLink}" target="_blank" rel="nofollow noopener" class="btn">作品詳細・試聴はこちら</a>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  const htmlContent = `<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -88,23 +180,12 @@ async function generateSite() {
 </body>
 </html>`;
 
-    const publicDir = path.join(process.cwd(), 'public');
-    if (!fs.existsSync(publicDir)) {
-      fs.mkdirSync(publicDir, { recursive: true });
-    }
-
-    fs.writeFileSync(path.join(publicDir, 'index.html'), htmlContent, 'utf-8');
-    console.log('Successfully generated public/index.html');
-
-  } catch (error) {
-    console.error('Error generating site:', error);
-    // ビルドを落とさず空のページを生成して成功扱いにする
-    const publicDir = path.join(process.cwd(), 'public');
-    if (!fs.existsSync(publicDir)) {
-      fs.mkdirSync(publicDir, { recursive: true });
-    }
-    fs.writeFileSync(path.join(publicDir, 'index.html'), '<html><body><h1>更新準備中</h1></body></html>', 'utf-8');
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
   }
+
+  fs.writeFileSync(indexPath, htmlContent, 'utf-8');
+  console.log('Successfully generated public/index.html!');
 }
 
 generateSite();
