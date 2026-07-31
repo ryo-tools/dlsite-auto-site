@@ -37,7 +37,7 @@ async function generateSite() {
     viewport: { width: 1440, height: 900 }
   });
 
-  // 年齢確認クッキーを付与
+  // 年齢確認クッキーを厳密に付与
   await context.addCookies([
     { name: 'adult', value: '1', domain: '.dlsite.com', path: '/' },
     { name: 'adult_checked', value: '1', domain: '.dlsite.com', path: '/' },
@@ -51,29 +51,30 @@ async function generateSite() {
     console.log('Navigating to DLsite maniax Top...');
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // 年齢確認等のモーダルが出ている場合は自動クリックで突破
-    const ageBtn = page.locator('a:has-text("はい"), button:has-text("はい"), .btn_yes, .btn_enter, .age_check_btn');
-    if (await ageBtn.count() > 0 && await ageBtn.first().isVisible()) {
+    // 年齢確認ボタンの誤検知回避対策
+    const ageBtn = page.locator('.btn_yes, a.btn_enter, .age_check_btn').first();
+    if (await ageBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       console.log('Clicking age verification modal...');
-      await ageBtn.first().click();
-      await page.waitForTimeout(2000);
+      await ageBtn.click();
+      await page.waitForTimeout(1000);
     }
 
-    console.log('Scrolling page to load images and content...');
-    await page.evaluate(() => window.scrollBy(0, 1000));
-    await page.waitForTimeout(2000);
+    // 遅延読み込み画像を完全に発生させるための段階的スクロール
+    console.log('Scrolling page to trigger lazy loading images...');
+    for (let i = 0; i < 4; i++) {
+      await page.evaluate(() => window.scrollBy(0, 800));
+      await page.waitForTimeout(500);
+    }
 
     console.log('Extracting product items from page...');
     items = await page.evaluate(() => {
       const results = [];
-      // ページ内のすべてのリンクを走査
       const anchors = Array.from(document.querySelectorAll('a'));
 
       for (const a of anchors) {
         if (results.length >= 30) break;
 
         const href = a.href || '';
-        // product_id / RJ番号が含まれるリンクのみ抽出
         if (!href.includes('/product_id/')) continue;
 
         let title = a.innerText?.trim() || '';
@@ -87,7 +88,7 @@ async function generateSite() {
         const cleanUrl = href.split('?')[0];
         if (results.some(r => r.url === cleanUrl)) continue;
 
-        // 親ブロックから画像URLとサークル名を取得
+        // 親ブロックから画像URLとサークル名を厳密抽出
         const box = a.closest('dl, li, tr, div, article, section');
         let imgUrl = '';
         let makerName = '同人サークル';
@@ -95,8 +96,15 @@ async function generateSite() {
         if (box) {
           const img = box.querySelector('img');
           if (img) {
-            imgUrl = img.src || img.getAttribute('data-src') || '';
+            // Lazy load属性をすべて検証
+            imgUrl = img.src || 
+                     img.getAttribute('data-src') || 
+                     img.getAttribute('data-original') || 
+                     img.getAttribute('data-lazy-src') || '';
+
             if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+            // dummyプレースホルダー画像を除外
+            if (imgUrl.includes('blank.gif') || imgUrl.includes('pixel.gif')) imgUrl = '';
           }
 
           const makerEl = box.querySelector('.maker_name, .sub_title, a[href*="/maker/"]');
@@ -115,7 +123,7 @@ async function generateSite() {
       return results;
     });
 
-    console.log(`Successfully fetched ${items.length} items using Playwright!`);
+    console.log(`Successfully fetched ${items.length} items with enhanced images using Playwright!`);
 
   } catch (error) {
     console.error('Browser automation error:', error.message);
