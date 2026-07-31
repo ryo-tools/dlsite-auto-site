@@ -8,7 +8,6 @@ const DOMAIN = 'https://dlsite-auto-site.pages.dev';
 async function fetchDLsiteData() {
   console.log('DLsiteデータ取得開始...');
   
-  // Bot検知を回避するためのブラウザ起動設定
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -25,20 +24,15 @@ async function fetchDLsiteData() {
   ]);
 
   try {
-    // ページへ移動
     await page.goto('https://www.dlsite.com/maniax/new', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    
-    // 画面を少し下にスクロールして画像やコンテンツを遅延読み込みさせる
     await page.evaluate(() => window.scrollBy(0, 500));
     await page.waitForTimeout(2000);
 
     const items = await page.evaluate((affiliateId) => {
-      // DLsiteの作品一覧要素を広くパース
       const elements = document.querySelectorAll('table.work_1col tr, .work_thumb_box, .dl_list_item, dt.work_name');
       const list = [];
 
       elements.forEach(el => {
-        // 親要素または自身から要素を探す
         const parent = el.closest('tr') || el.closest('.work_thumb_box') || el.parentElement;
         if (!parent) return;
 
@@ -49,7 +43,6 @@ async function fetchDLsiteData() {
 
         if (titleEl) {
           let link = titleEl.getAttribute('href') || titleEl.href || '';
-          
           if (!link) return;
 
           // 絶対パスへ補正
@@ -59,10 +52,11 @@ async function fetchDLsiteData() {
             link = 'https://www.dlsite.com/' + link;
           }
 
-          // アフィリエイトIDを付与（既存のクエリを整理）
+          // アフィリエイトIDを付与
           const cleanLink = link.split('?')[0];
           link = `${cleanLink}?af_id=${affiliateId}`;
 
+          // 画像URLの堅牢な取得
           let imgUrl = '';
           if (imgEl) {
             imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || imgEl.src || '';
@@ -95,30 +89,31 @@ async function fetchDLsiteData() {
   }
 }
 
-// 共通CSSスタイル
+// 元のすっきりした青系CSSスタイル（モダン＆シンプル）
 const commonStyle = `
-  :root { --primary: #e60012; --bg: #f8f9fa; --card-bg: #ffffff; --text: #333333; }
+  :root { --primary: #2563eb; --primary-hover: #1d4ed8; --bg: #f8fafc; --card-bg: #ffffff; --text: #1e293b; --text-muted: #64748b; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; line-height: 1.6; }
-  header { background: var(--primary); color: white; padding: 1rem 2rem; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-  header h1 { margin: 0; font-size: 1.5rem; }
-  nav.categories { background: #cc0010; padding: 0.5rem; text-align: center; }
-  nav.categories a { color: white; text-decoration: none; margin: 0 10px; font-weight: bold; font-size: 0.9rem; }
-  nav.categories a:hover { text-decoration: underline; }
-  .breadcrumb { max-width: 1200px; margin: 10px auto; padding: 0 20px; font-size: 0.85rem; color: #666; }
-  .breadcrumb a { color: #0066cc; text-decoration: none; }
-  .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
-  .card { background: var(--card-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: transform 0.2s; display: flex; flex-direction: column; }
-  .card:hover { transform: translateY(-4px); }
-  .card img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
-  .card-body { padding: 15px; display: flex; flex-direction: column; flex-grow: 1; }
-  .card-title { font-size: 0.95rem; font-weight: bold; margin: 0 0 8px 0; line-height: 1.4; height: 2.8em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .card-maker { font-size: 0.8rem; color: #666; margin-bottom: 8px; }
-  .card-price { font-size: 1rem; color: var(--primary); font-weight: bold; margin-top: auto; margin-bottom: 12px; }
-  .btn { display: block; text-align: center; background: var(--primary); color: white; text-decoration: none; padding: 8px 0; border-radius: 4px; font-weight: bold; font-size: 0.9rem; }
-  .btn:hover { opacity: 0.9; }
-  footer { text-align: center; padding: 20px; background: #333; color: #fff; margin-top: 40px; font-size: 0.85rem; }
-  footer a { color: #aaa; text-decoration: none; margin: 0 10px; }
+  header { background: #ffffff; color: var(--text); padding: 1.5rem 2rem; text-align: center; border-bottom: 1px solid #e2e8f0; }
+  header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #0f172a; }
+  nav.categories { background: #1e293b; padding: 0.6rem; text-align: center; }
+  nav.categories a { color: #f8fafc; text-decoration: none; margin: 0 12px; font-weight: 600; font-size: 0.9rem; transition: color 0.2s; }
+  nav.categories a:hover { color: #38bdf8; }
+  .breadcrumb { max-width: 1200px; margin: 12px auto; padding: 0 20px; font-size: 0.85rem; color: var(--text-muted); }
+  .breadcrumb a { color: var(--primary); text-decoration: none; }
+  .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; }
+  .card { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 8px 16px rgba(0,0,0,0.08); }
+  .card-img-wrapper { width: 100%; height: 200px; background: #e2e8f0; position: relative; overflow: hidden; }
+  .card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card-body { padding: 16px; display: flex; flex-direction: column; flex-grow: 1; }
+  .card-title { font-size: 0.92rem; font-weight: 600; margin: 0 0 8px 0; line-height: 1.4; height: 2.8em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--text); }
+  .card-maker { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px; }
+  .card-price { font-size: 1.05rem; color: #2563eb; font-weight: 700; margin-top: auto; margin-bottom: 12px; }
+  .btn { display: block; text-align: center; background: var(--primary); color: white; text-decoration: none; padding: 10px 0; border-radius: 8px; font-weight: 600; font-size: 0.88rem; transition: background 0.2s; }
+  .btn:hover { background: var(--primary-hover); }
+  footer { text-align: center; padding: 24px; background: #ffffff; color: var(--text-muted); margin-top: 48px; border-top: 1px solid #e2e8f0; font-size: 0.85rem; }
+  footer a { color: var(--primary); text-decoration: none; margin: 0 8px; }
 `;
 
 function generateHTML(title, description, items, breadcrumbs) {
@@ -141,7 +136,7 @@ function generateHTML(title, description, items, breadcrumbs) {
   </header>
   <nav class="categories">
     <a href="/">総合最新</a> | 
-    <a href="/asmr/">ASMR・同人音声</a>
+    <a href="/asmr/">音声・ASMR特化</a>
   </nav>
 
   <div class="breadcrumb">
@@ -152,7 +147,9 @@ function generateHTML(title, description, items, breadcrumbs) {
     <div class="grid">
       ${items.map(item => `
         <div class="card">
-          <img src="${item.image}" alt="${item.title}" loading="lazy">
+          <div class="card-img-wrapper">
+            <img src="${item.image}" alt="${item.title}" loading="lazy" onerror="this.onerror=null;this.src='https://www.dlsite.com/images/web/common/no_image/no_image_200x200.gif';">
+          </div>
           <div class="card-body">
             <div class="card-title">${item.title}</div>
             <div class="card-maker">${item.maker}</div>
@@ -165,7 +162,7 @@ function generateHTML(title, description, items, breadcrumbs) {
   </div>
 
   <footer>
-    <p><a href="/">トップページ</a> | <a href="/asmr/">ASMR・同人音声</a></p>
+    <p><a href="/">トップページ</a> | <a href="/asmr/">音声・ASMR特化</a></p>
     <p>&copy; 2026 DLsiteおすすめ作品まとめ</p>
   </footer>
 </body>
@@ -204,10 +201,10 @@ async function main() {
 
   const asmrBreadcrumbs = [
     { name: 'ホーム', path: '/' },
-    { name: 'ASMR・同人音声', path: '/asmr/' }
+    { name: '音声・ASMR特化', path: '/asmr/' }
   ];
   const asmrHTML = generateHTML(
-    'DLsite ASMR・同人音声おすすめまとめ | 毎日更新ナビ',
+    'DLsite 音声・ASMRおすすめまとめ | 毎日更新ナビ',
     'DLsiteで人気のASMR・同人音声作品を厳選してお届け。安眠系・耳かき・シチュエーションボイスなど最新作品を毎日更新！',
     asmrItems.length > 0 ? asmrItems : items,
     asmrBreadcrumbs
@@ -235,7 +232,7 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  console.log('ビルド完了: HTMLおよびリンクの修復が完了しました。');
+  console.log('ビルド完了: 青系デザイン戻し、画像・リンク・SEO情報を更新しました。');
 }
 
 main();
