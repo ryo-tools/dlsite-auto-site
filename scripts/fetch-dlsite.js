@@ -7,53 +7,79 @@ const DOMAIN = 'https://dlsite-auto-site.pages.dev';
 
 async function fetchDLsiteData() {
   console.log('DLsiteデータ取得開始...');
+  
+  // Bot検知を回避するためのブラウザ起動設定
   const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 800 },
+    locale: 'ja-JP'
+  });
+  
+  const page = await context.newPage();
 
-  // 年齢認証クッキー
-  await page.context().addCookies([
-    { name: 'adultchecked', value: '1', domain: '.dlsite.com', path: '/' }
+  // 年齢認証クッキーを設定
+  await context.addCookies([
+    { name: 'adultchecked', value: '1', domain: '.dlsite.com', path: '/' },
+    { name: 'work_view_option', value: '1', domain: '.dlsite.com', path: '/' }
   ]);
 
   try {
+    // ページへ移動
     await page.goto('https://www.dlsite.com/maniax/new', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForSelector('.work_1col', { timeout: 10000 }).catch(() => {});
+    
+    // 画面を少し下にスクロールして画像やコンテンツを遅延読み込みさせる
+    await page.evaluate(() => window.scrollBy(0, 500));
+    await page.waitForTimeout(2000);
 
     const items = await page.evaluate((affiliateId) => {
-      const elements = document.querySelectorAll('.work_1col tr, .work_thumb_box');
+      // DLsiteの作品一覧要素を広くパース
+      const elements = document.querySelectorAll('table.work_1col tr, .work_thumb_box, .dl_list_item, dt.work_name');
       const list = [];
 
       elements.forEach(el => {
-        const titleEl = el.querySelector('.work_name a');
-        const makerEl = el.querySelector('.maker_name a');
-        const imgEl = el.querySelector('img');
-        const priceEl = el.querySelector('.price') || el.querySelector('.work_price');
+        // 親要素または自身から要素を探す
+        const parent = el.closest('tr') || el.closest('.work_thumb_box') || el.parentElement;
+        if (!parent) return;
+
+        const titleEl = parent.querySelector('.work_name a, .work_title a, dt a');
+        const makerEl = parent.querySelector('.maker_name a, .author a, .maker a');
+        const imgEl = parent.querySelector('img');
+        const priceEl = parent.querySelector('.price, .work_price, .price_default');
 
         if (titleEl) {
           let link = titleEl.getAttribute('href') || titleEl.href || '';
           
-          // 相対パスの場合は絶対URL（https://www.dlsite.com）に補正
+          if (!link) return;
+
+          // 絶対パスへ補正
           if (link.startsWith('/')) {
             link = 'https://www.dlsite.com' + link;
           } else if (!link.startsWith('http')) {
             link = 'https://www.dlsite.com/' + link;
           }
 
-          // アフィリエイトIDの付与
-          if (affiliateId) {
-            link += (link.includes('?') ? '&' : '?') + `af_id=${affiliateId}`;
+          // アフィリエイトIDを付与（既存のクエリを整理）
+          const cleanLink = link.split('?')[0];
+          link = `${cleanLink}?af_id=${affiliateId}`;
+
+          let imgUrl = '';
+          if (imgEl) {
+            imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || imgEl.src || '';
+            if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
           }
 
-          let imgUrl = imgEl ? (imgEl.getAttribute('data-src') || imgEl.src) : '';
-          if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+          const titleText = titleEl.innerText ? titleEl.innerText.trim() : '';
 
-          list.push({
-            title: titleEl.innerText.trim(),
-            link: link,
-            maker: makerEl ? makerEl.innerText.trim() : '不明',
-            image: imgUrl,
-            price: priceEl ? priceEl.innerText.trim() : '価格情報なし'
-          });
+          if (titleText && !list.some(i => i.link === link)) {
+            list.push({
+              title: titleText,
+              link: link,
+              maker: makerEl ? makerEl.innerText.trim() : 'DLsite',
+              image: imgUrl,
+              price: priceEl ? priceEl.innerText.trim() : '価格情報なし'
+            });
+          }
         }
       });
       return list;
@@ -209,7 +235,7 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  console.log('ビルド完了: 絶対URLへの補正およびアフィリエイトIDを反映しました。');
+  console.log('ビルド完了: HTMLおよびリンクの修復が完了しました。');
 }
 
 main();
