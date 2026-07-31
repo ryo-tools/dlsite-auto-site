@@ -4,9 +4,8 @@ import { chromium } from 'playwright';
 
 // アフィリエイトID
 const AFFILIATE_ID = 'yofukashireview'; 
-
-// トップページ（100%年齢クッキーが効いてランキング・新着作品が取得可能なURL）
 const TARGET_URL = 'https://www.dlsite.com/maniax/';
+const SITE_DOMAIN = 'https://dlsite-auto-site.pages.dev';
 
 function addAffiliateTag(url, affId) {
   if (!url) return '#';
@@ -24,9 +23,51 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function buildHtmlTemplate({ title, description, canonicalUrl, itemsHtml }) {
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <link rel="canonical" href="${canonicalUrl}">
+  
+  <!-- OGP (SNS表示用タグ) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:url" content="${canonicalUrl}">
+  <meta property="og:site_name" content="音声・ASMR特化まとめナビ">
+  
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <h1><a href="/" style="color: inherit; text-decoration: none;">音声・ASMR特化まとめナビ</a></h1>
+      <p>DLsiteの最新・人気作品を毎日自動更新中</p>
+      <nav style="margin-top: 15px; display: flex; justify-content: center; gap: 15px;">
+        <a href="/" style="color: #38bdf8; text-decoration: none; font-weight: bold;">[ 全体最新 ]</a>
+        <a href="/asmr/" style="color: #38bdf8; text-decoration: none; font-weight: bold;">[ ASMR・音声特化 ]</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container grid">
+    ${itemsHtml}
+  </main>
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; ${new Date().getFullYear()} 音声・ASMR特化まとめナビ. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>`;
+}
+
 async function generateSite() {
   const publicDir = path.join(process.cwd(), 'public');
-  const indexPath = path.join(publicDir, 'index.html');
+  const asmrDir = path.join(publicDir, 'asmr');
 
   console.log('Starting headless browser...');
   const browser = await chromium.launch({ headless: true });
@@ -57,7 +98,6 @@ async function generateSite() {
       await page.waitForTimeout(1000);
     }
 
-    // 遅延読み込みの全画像を展開するために画面下部までスクロール＆待機
     console.log('Scrolling page to trigger image loading...');
     for (let i = 0; i < 6; i++) {
       await page.evaluate(() => window.scrollBy(0, 800));
@@ -67,7 +107,6 @@ async function generateSite() {
     console.log('Extracting product items from DOM...');
     items = await page.evaluate(() => {
       const results = [];
-      // 各作品の要素ブロックを取得
       const workElements = Array.from(document.querySelectorAll('.work_1col, .work_thumb_inner, .search_result_item, .work_item, dl, li'));
 
       for (const box of workElements) {
@@ -89,10 +128,8 @@ async function generateSite() {
         const cleanUrl = href.split('?')[0];
         if (results.some(r => r.url === cleanUrl)) continue;
 
-        // 画像URLの厳密取得
         let imgUrl = '';
         if (img) {
-          // 属性の優先順位をつけて本物の画像URLを取得
           const candidate = img.getAttribute('data-src') || 
                             img.getAttribute('data-original') || 
                             img.getAttribute('data-lazy-src') || 
@@ -116,27 +153,14 @@ async function generateSite() {
       return results;
     });
 
-    console.log(`Successfully fetched ${items.length} items using Playwright!`);
-
   } catch (error) {
     console.error('Browser automation error:', error.message);
   } finally {
     await browser.close();
   }
 
-  if (items.length === 0) {
-    console.warn('Fallback to sample data as browser returned 0 items');
-    items = [
-      {
-        title: '【ASMR】耳かき＆最高級甘やかしボイス',
-        makerName: '声優特化サークル',
-        url: 'https://www.dlsite.com/maniax/work/=/product_id/RJ01183210.html',
-        imgUrl: ''
-      }
-    ];
-  }
-
-  const itemsHtml = items.map(item => {
+  // HTMLカード要素の生成ヘルパー
+  const renderCards = (itemList) => itemList.map(item => {
     const affLink = addAffiliateTag(item.url, AFFILIATE_ID);
     return `
       <article class="card">
@@ -154,39 +178,33 @@ async function generateSite() {
     `;
   }).join('');
 
-  const htmlContent = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>【最新】おすすめASMR・同人音声まとめ特化ナビ</title>
-  <meta name="description" content="DLsiteの最新おすすめASMR・同人音声作品を自動更新で届ける特化型データベースです。">
-  <link rel="stylesheet" href="./css/style.css">
-</head>
-<body>
-  <header class="header">
-    <div class="container">
-      <h1>音声・ASMR特化まとめナビ</h1>
-      <p>DLsiteの最新・人気作品を毎日自動更新中</p>
-    </div>
-  </header>
-  <main class="container grid">
-    ${itemsHtml}
-  </main>
-  <footer class="footer">
-    <div class="container">
-      <p>&copy; ${new Date().getFullYear()} 音声・ASMR特化まとめナビ. All rights reserved.</p>
-    </div>
-  </footer>
-</body>
-</html>`;
+  // 1. トップページ用（全体最新30件）
+  const topHtml = buildHtmlTemplate({
+    title: '【最新】おすすめASMR・同人音声まとめ特化ナビ',
+    description: 'DLsiteの最新おすすめASMR・同人音声作品を自動更新で届ける特化型データベースです。',
+    canonicalUrl: `${SITE_DOMAIN}/`,
+    itemsHtml: renderCards(items)
+  });
 
-  if (!fs.existsSync(publicDir)) {
-    fs.mkdirSync(publicDir, { recursive: true });
-  }
+  // 2. SEO特化ページ用（ASMR・ボイスタイトルを中心に抽出）
+  const asmrItems = items.filter(i => i.title.includes('ASMR') || i.title.includes('ボイス') || i.title.includes('耳かき') || i.title.includes('音声'));
+  const targetAsmrItems = asmrItems.length > 0 ? asmrItems : items;
 
-  fs.writeFileSync(indexPath, htmlContent, 'utf-8');
-  console.log('Successfully generated public/index.html!');
+  const asmrHtml = buildHtmlTemplate({
+    title: '【2026年最新】おすすめASMR・同人音声作品まとめ - 特化ナビ',
+    description: '耳かき・睡眠導入・甘やかしなど、DLsiteで今売れている人気のASMR・同人音声作品をまとめた特化ページです。',
+    canonicalUrl: `${SITE_DOMAIN}/asmr/`,
+    itemsHtml: renderCards(targetAsmrItems)
+  });
+
+  // ディレクトリ生成 & 書き込み
+  if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
+  if (!fs.existsSync(asmrDir)) fs.mkdirSync(asmrDir, { recursive: true });
+
+  fs.writeFileSync(path.join(publicDir, 'index.html'), topHtml, 'utf-8');
+  fs.writeFileSync(path.join(asmrDir, 'index.html'), asmrHtml, 'utf-8');
+
+  console.log('Successfully generated multiple SEO pages (index.html & asmr/index.html)!');
 }
 
 generateSite();
