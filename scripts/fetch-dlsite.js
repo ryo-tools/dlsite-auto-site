@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { chromium } from 'playwright';
 
-const AFFILIATE_ID = 'yofukashireview'; // 審査通過後に変更
+const AFFILIATE_ID = 'yofukashireview';
 const DOMAIN = 'https://dlsite-auto-site.pages.dev';
 
 async function fetchDLsiteData() {
@@ -30,8 +30,17 @@ async function fetchDLsiteData() {
         const priceEl = el.querySelector('.price') || el.querySelector('.work_price');
 
         if (titleEl) {
-          let link = titleEl.href;
-          if (affiliateId && affiliateId !== 'YOUR_AFFILIATE_ID') {
+          let link = titleEl.getAttribute('href') || titleEl.href || '';
+          
+          // 相対パスの場合は絶対URL（https://www.dlsite.com）に補正
+          if (link.startsWith('/')) {
+            link = 'https://www.dlsite.com' + link;
+          } else if (!link.startsWith('http')) {
+            link = 'https://www.dlsite.com/' + link;
+          }
+
+          // アフィリエイトIDの付与
+          if (affiliateId) {
             link += (link.includes('?') ? '&' : '?') + `af_id=${affiliateId}`;
           }
 
@@ -86,7 +95,7 @@ const commonStyle = `
   footer a { color: #aaa; text-decoration: none; margin: 0 10px; }
 `;
 
-function generateHTML(title, description, items, breadcrumbs, categoryPath = '') {
+function generateHTML(title, description, items, breadcrumbs) {
   const breadcrumbHTML = breadcrumbs.map((b, i) => 
     i === breadcrumbs.length - 1 ? `<span>${b.name}</span>` : `<a href="${b.path}">${b.name}</a> &gt; `
   ).join('');
@@ -151,7 +160,7 @@ async function main() {
   if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
   if (!fs.existsSync(asmrDir)) fs.mkdirSync(asmrDir, { recursive: true });
 
-  // 1. トップページ（全ジャンル）
+  // 1. トップページ
   const topBreadcrumbs = [{ name: 'ホーム', path: '/' }];
   const topHTML = generateHTML(
     'DLsiteおすすめ作品まとめ | 毎日更新ナビ',
@@ -174,13 +183,12 @@ async function main() {
   const asmrHTML = generateHTML(
     'DLsite ASMR・同人音声おすすめまとめ | 毎日更新ナビ',
     'DLsiteで人気のASMR・同人音声作品を厳選してお届け。安眠系・耳かき・シチュエーションボイスなど最新作品を毎日更新！',
-    asmrItems.length > 0 ? asmrItems : items, // 絞り込めない場合は全件バックアップ
-    asmrBreadcrumbs,
-    '/asmr/'
+    asmrItems.length > 0 ? asmrItems : items,
+    asmrBreadcrumbs
   );
   fs.writeFileSync(path.join(asmrDir, 'index.html'), asmrHTML);
 
-  // 3. SEO用 sitemap.xml & robots.txt 自動生成
+  // 3. SEO用 sitemap.xml & robots.txt
   const sitemapXML = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -201,7 +209,7 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  console.log('ビルド完了: index.html, asmr/index.html, sitemap.xml, robots.txt を更新しました。');
+  console.log('ビルド完了: 絶対URLへの補正およびアフィリエイトIDを反映しました。');
 }
 
 main();
