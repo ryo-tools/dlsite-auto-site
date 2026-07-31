@@ -45,7 +45,7 @@ async function fetchDLsiteData() {
           let link = titleEl.getAttribute('href') || titleEl.href || '';
           if (!link) return;
 
-          // 絶対パスへ補正
+          // 絶対パス補正
           if (link.startsWith('/')) {
             link = 'https://www.dlsite.com' + link;
           } else if (!link.startsWith('http')) {
@@ -56,7 +56,7 @@ async function fetchDLsiteData() {
           const cleanLink = link.split('?')[0];
           link = `${cleanLink}?af_id=${affiliateId}`;
 
-          // 画像URLの堅牢な取得
+          // 画像URLの取得
           let imgUrl = '';
           if (imgEl) {
             imgUrl = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || imgEl.src || '';
@@ -89,31 +89,31 @@ async function fetchDLsiteData() {
   }
 }
 
-// 元のすっきりした青系CSSスタイル（モダン＆シンプル）
+// 初期状態のシンプル＆クリーンなデザインスタイル
 const commonStyle = `
-  :root { --primary: #2563eb; --primary-hover: #1d4ed8; --bg: #f8fafc; --card-bg: #ffffff; --text: #1e293b; --text-muted: #64748b; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; line-height: 1.6; }
-  header { background: #ffffff; color: var(--text); padding: 1.5rem 2rem; text-align: center; border-bottom: 1px solid #e2e8f0; }
-  header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #0f172a; }
-  nav.categories { background: #1e293b; padding: 0.6rem; text-align: center; }
-  nav.categories a { color: #f8fafc; text-decoration: none; margin: 0 12px; font-weight: 600; font-size: 0.9rem; transition: color 0.2s; }
-  nav.categories a:hover { color: #38bdf8; }
-  .breadcrumb { max-width: 1200px; margin: 12px auto; padding: 0 20px; font-size: 0.85rem; color: var(--text-muted); }
-  .breadcrumb a { color: var(--primary); text-decoration: none; }
-  .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; }
-  .card { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; }
-  .card:hover { transform: translateY(-3px); box-shadow: 0 8px 16px rgba(0,0,0,0.08); }
-  .card-img-wrapper { width: 100%; height: 200px; background: #e2e8f0; position: relative; overflow: hidden; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f5f7fa; color: #333; margin: 0; padding: 0; line-height: 1.5; }
+  header { background-color: #ffffff; padding: 20px; text-align: center; border-bottom: 1px solid #e1e8ed; }
+  header h1 { margin: 0; font-size: 1.4rem; color: #1c2938; }
+  nav.categories { background-color: #2b3846; padding: 10px; text-align: center; }
+  nav.categories a { color: #ffffff; text-decoration: none; margin: 0 15px; font-weight: bold; font-size: 0.9rem; }
+  nav.categories a:hover { color: #40916c; text-decoration: underline; }
+  .breadcrumb { max-width: 1200px; margin: 15px auto 0; padding: 0 20px; font-size: 0.85rem; color: #657786; }
+  .breadcrumb a { color: #1da1f2; text-decoration: none; }
+  .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+  .card { background: #ffffff; border-radius: 8px; border: 1px solid #e1e8ed; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.15s ease; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .card-img-wrapper { width: 100%; height: 180px; background-color: #e1e8ed; overflow: hidden; }
   .card img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .card-body { padding: 16px; display: flex; flex-direction: column; flex-grow: 1; }
-  .card-title { font-size: 0.92rem; font-weight: 600; margin: 0 0 8px 0; line-height: 1.4; height: 2.8em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--text); }
-  .card-maker { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px; }
-  .card-price { font-size: 1.05rem; color: #2563eb; font-weight: 700; margin-top: auto; margin-bottom: 12px; }
-  .btn { display: block; text-align: center; background: var(--primary); color: white; text-decoration: none; padding: 10px 0; border-radius: 8px; font-weight: 600; font-size: 0.88rem; transition: background 0.2s; }
-  .btn:hover { background: var(--primary-hover); }
-  footer { text-align: center; padding: 24px; background: #ffffff; color: var(--text-muted); margin-top: 48px; border-top: 1px solid #e2e8f0; font-size: 0.85rem; }
-  footer a { color: var(--primary); text-decoration: none; margin: 0 8px; }
+  .card-body { padding: 12px; display: flex; flex-direction: column; flex-grow: 1; }
+  .card-title { font-size: 0.9rem; font-weight: bold; margin: 0 0 6px 0; line-height: 1.35; height: 2.7em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: #1c2938; }
+  .card-maker { font-size: 0.8rem; color: #657786; margin-bottom: 8px; }
+  .card-price { font-size: 0.95rem; color: #e63946; font-weight: bold; margin-top: auto; margin-bottom: 10px; }
+  .btn { display: block; text-align: center; background-color: #1da1f2; color: #ffffff; text-decoration: none; padding: 8px 0; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
+  .btn:hover { background-color: #0c85d0; }
+  footer { text-align: center; padding: 20px; background: #ffffff; color: #657786; margin-top: 40px; border-top: 1px solid #e1e8ed; font-size: 0.85rem; }
+  footer a { color: #1da1f2; text-decoration: none; margin: 0 10px; }
 `;
 
 function generateHTML(title, description, items, breadcrumbs) {
@@ -148,7 +148,7 @@ function generateHTML(title, description, items, breadcrumbs) {
       ${items.map(item => `
         <div class="card">
           <div class="card-img-wrapper">
-            <img src="${item.image}" alt="${item.title}" loading="lazy" onerror="this.onerror=null;this.src='https://www.dlsite.com/images/web/common/no_image/no_image_200x200.gif';">
+            <img src="${item.image}" alt="${item.title}" loading="lazy" referrerpolicy="no-referrer">
           </div>
           <div class="card-body">
             <div class="card-title">${item.title}</div>
@@ -232,7 +232,7 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  console.log('ビルド完了: 青系デザイン戻し、画像・リンク・SEO情報を更新しました。');
+  console.log('ビルド完了: リファラー制御（no-referrer）を追加し、初期デザインに復元しました。');
 }
 
 main();
