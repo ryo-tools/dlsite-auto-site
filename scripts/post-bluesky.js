@@ -4,6 +4,7 @@ import { BskyAgent } from '@atproto/api';
 
 const HANDLE = process.env.BLUESKY_HANDLE;
 const PASSWORD = process.env.BLUESKY_PASSWORD;
+const SITE_URL = 'https://dlsite-auto-site.pages.dev';
 
 async function postToBluesky() {
   if (!HANDLE || !PASSWORD) {
@@ -49,12 +50,10 @@ async function postToBluesky() {
           const arrayBuffer = await response.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
 
-          // Blueskyサーバーへ画像をアップロード
           const uploadRes = await agent.uploadBlob(buffer, {
             encoding: 'image/jpeg'
           });
 
-          // ポスト添付用データを作成
           imageEmbed = {
             $type: 'app.bsky.embed.images',
             images: [
@@ -71,10 +70,9 @@ async function postToBluesky() {
       }
     }
 
-    // 投稿本文を作成
-    const text = `【DLsite最新おすすめ作品】\n\n『${topItem.title}』\nサークル：${topItem.maker}\n価格：${topItem.price}\n\n👇作品の詳細・チェックはこちら\n${topItem.link}`;
+    // 直リンクではなく、自作サイトのURLへ誘導する本文を作成
+    const text = `【DLsite最新おすすめ作品】\n\n『${topItem.title}』\nサークル：${topItem.maker}\n価格：${topItem.price}\n\n👇最新の作品一覧・詳細はこちらから\n${SITE_URL}`;
 
-    // 投稿パラメータ作成
     const postPayload = {
       text: text,
       createdAt: new Date().toISOString()
@@ -86,7 +84,7 @@ async function postToBluesky() {
 
     await agent.post(postPayload);
 
-    console.log(`Blueskyへの画像付き自動投稿完了: ${topItem.title}`);
+    console.log(`Blueskyへのサイト誘導投稿完了: ${topItem.title}`);
   } catch (error) {
     console.error('Bluesky投稿エラー:', error);
   }
