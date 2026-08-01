@@ -67,7 +67,7 @@ async function postToBluesky() {
     const rt = new RichText({ text: rawText });
     await rt.detectFacets(agent); // URLを検出して青文字リンク（facets）化
 
-    // 2. 「画像を押すとサイトに飛ぶ」外部リンクカード（embed.external）を作成
+    // 2. 「画像を押すとサイトに飛ぶ」外部リンクカード（embed.external）とセルフラベルを設定
     const postPayload = {
       text: rt.text,
       facets: rt.facets,
@@ -80,12 +80,18 @@ async function postToBluesky() {
           thumb: thumbBlob
         }
       },
+      labels: {
+        $type: 'com.atproto.label.defs.selfLabels',
+        values: [
+          { val: 'sexual' }
+        ]
+      },
       createdAt: new Date().toISOString()
     };
 
     await agent.post(postPayload);
 
-    console.log(`Blueskyへのサイト誘導（リンクカード化）投稿完了: ${topItem.title}`);
+    console.log(`Blueskyへのサイト誘導（セルフラベル付き）投稿完了: ${topItem.title}`);
   } catch (error) {
     console.error('Bluesky投稿エラー:', error);
   }
