@@ -4,7 +4,7 @@ import { BskyAgent, RichText } from '@atproto/api';
 
 const HANDLE = process.env.BLUESKY_HANDLE;
 const PASSWORD = process.env.BLUESKY_PASSWORD;
-const SITE_URL = 'https://dlsite-auto-site.pages.dev';
+const SITE_URL = 'https://dlsite-auto-site.pages.dev/asmr/';
 
 async function postToBluesky() {
   if (!HANDLE || !PASSWORD) {
@@ -24,8 +24,14 @@ async function postToBluesky() {
     return;
   }
 
-  // 1番目の最新作品を取得
-  const topItem = items[0];
+  // ASMR・音声作品に絞り込む
+  const asmrKeywords = ['ASMR', '音声', 'ボイス', '耳かき', '睡眠', '囁き', '耳攻め', '癒やし', 'バイノーラル', 'シチュエーション'];
+  const asmrItems = items.filter(item => 
+    asmrKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw))
+  );
+
+  // ASMR作品が見つかればその1番目、なければ全体の1番目を取得
+  const topItem = asmrItems.length > 0 ? asmrItems[0] : items[0];
 
   const agent = new BskyAgent({ service: 'https://bsky.social' });
 
@@ -63,7 +69,7 @@ async function postToBluesky() {
     }
 
     // 1. 本文テキストを作成し、RichTextでURLを自動リンク化
-    const rawText = `【DLsite最新おすすめ作品】\n\n『${topItem.title}』\nサークル：${topItem.maker}\n価格：${topItem.price}\n\n👇最新の作品一覧・詳細はこちらから\n${SITE_URL}`;
+    const rawText = `【DLsite最新おすすめASMR】\n\n『${topItem.title}』\nサークル：${topItem.maker}\n価格：${topItem.price}\n\n👇最新のASMR作品一覧・詳細はこちらから\n${SITE_URL}`;
     const rt = new RichText({ text: rawText });
     await rt.detectFacets(agent); // URLを検出して青文字リンク（facets）化
 
@@ -75,8 +81,8 @@ async function postToBluesky() {
         $type: 'app.bsky.embed.external',
         external: {
           uri: SITE_URL,
-          title: `【最新】${topItem.title}`,
-          description: `サークル: ${topItem.maker} | 価格: ${topItem.price} - おすすめ同人作品まとめ`,
+          title: `【最新ASMR】${topItem.title}`,
+          description: `サークル: ${topItem.maker} | 価格: ${topItem.price} - DLsiteおすすめASMR・同人音声まとめ`,
           thumb: thumbBlob
         }
       },
@@ -91,7 +97,7 @@ async function postToBluesky() {
 
     await agent.post(postPayload);
 
-    console.log(`Blueskyへのサイト誘導（セルフラベル付き）投稿完了: ${topItem.title}`);
+    console.log(`BlueskyへのASMR作品投稿完了: ${topItem.title}`);
   } catch (error) {
     console.error('Bluesky投稿エラー:', error);
   }
