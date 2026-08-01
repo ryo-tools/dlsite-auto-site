@@ -126,8 +126,8 @@ const commonStyle = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f5f7fa; color: #333; margin: 0; padding: 0; line-height: 1.5; }
   header { background-color: #ffffff; padding: 20px; text-align: center; border-bottom: 1px solid #e1e8ed; }
   header h1 { margin: 0; font-size: 1.4rem; color: #1c2938; }
-  nav.categories { background-color: #2b3846; padding: 10px; text-align: center; }
-  nav.categories a { color: #ffffff; text-decoration: none; margin: 0 15px; font-weight: bold; font-size: 0.9rem; }
+  nav.categories { background-color: #2b3846; padding: 10px; text-align: center; flex-wrap: wrap; display: flex; justify-content: center; gap: 15px; }
+  nav.categories a { color: #ffffff; text-decoration: none; font-weight: bold; font-size: 0.9rem; }
   nav.categories a:hover { color: #1da1f2; text-decoration: underline; }
   .breadcrumb { max-width: 1200px; margin: 15px auto 0; padding: 0 20px; font-size: 0.85rem; color: #657786; }
   .breadcrumb a { color: #1da1f2; text-decoration: none; }
@@ -167,8 +167,10 @@ function generateHTML(title, description, items, breadcrumbs) {
     <h1>${title}</h1>
   </header>
   <nav class="categories">
-    <a href="/">総合最新</a> | 
+    <a href="/">総合最新</a>
     <a href="/asmr/">音声・ASMR特化</a>
+    <a href="/manga/">マンガ・コミック</a>
+    <a href="/game/">ゲーム・CG</a>
   </nav>
 
   <div class="breadcrumb">
@@ -194,7 +196,12 @@ function generateHTML(title, description, items, breadcrumbs) {
   </div>
 
   <footer>
-    <p><a href="/">トップページ</a> | <a href="/asmr/">音声・ASMR特化</a></p>
+    <p>
+      <a href="/">トップページ</a> | 
+      <a href="/asmr/">音声・ASMR</a> | 
+      <a href="/manga/">マンガ</a> | 
+      <a href="/game/">ゲーム</a>
+    </p>
     <p>&copy; 2026 DLsiteおすすめ作品まとめ</p>
   </footer>
 </body>
@@ -211,11 +218,15 @@ async function main() {
 
   const publicDir = path.join(process.cwd(), 'public');
   const asmrDir = path.join(publicDir, 'asmr');
+  const mangaDir = path.join(publicDir, 'manga');
+  const gameDir = path.join(publicDir, 'game');
 
   if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
   if (!fs.existsSync(asmrDir)) fs.mkdirSync(asmrDir, { recursive: true });
+  if (!fs.existsSync(mangaDir)) fs.mkdirSync(mangaDir, { recursive: true });
+  if (!fs.existsSync(gameDir)) fs.mkdirSync(gameDir, { recursive: true });
 
-  // 1. トップページ
+  // 1. トップページ（総合）
   const topBreadcrumbs = [{ name: 'ホーム', path: '/' }];
   const topHTML = generateHTML(
     'DLsiteおすすめ作品まとめ | 毎日更新ナビ',
@@ -243,7 +254,41 @@ async function main() {
   );
   fs.writeFileSync(path.join(asmrDir, 'index.html'), asmrHTML);
 
-  // 3. SEO用 sitemap.xml & robots.txt
+  // 3. マンガ・コミック特化ページ
+  const mangaKeywords = ['CG', 'CG集', 'コミック', 'マンガ', '漫画', '同人誌', 'イラスト'];
+  const mangaItems = items.filter(item => 
+    mangaKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw))
+  );
+  const mangaBreadcrumbs = [
+    { name: 'ホーム', path: '/' },
+    { name: 'マンガ・コミック', path: '/manga/' }
+  ];
+  const mangaHTML = generateHTML(
+    'DLsite 同人マンガ・CG集おすすめまとめ | 毎日更新ナビ',
+    'DLsiteで人気の同人マンガ・CG集・イラスト作品を厳選してお届け。話題の新作コミックを毎日更新！',
+    mangaItems.length > 0 ? mangaItems : items,
+    mangaBreadcrumbs
+  );
+  fs.writeFileSync(path.join(mangaDir, 'index.html'), mangaHTML);
+
+  // 4. ゲーム・CG特化ページ
+  const gameKeywords = ['ゲーム', 'RPG', 'ACT', 'SLG', 'ADV', 'ノベル', 'シミュレーション', '体験版'];
+  const gameItems = items.filter(item => 
+    gameKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw))
+  );
+  const gameBreadcrumbs = [
+    { name: 'ホーム', path: '/' },
+    { name: 'ゲーム・CG', path: '/game/' }
+  ];
+  const gameHTML = generateHTML(
+    'DLsite 同人ゲームおすすめまとめ | 毎日更新ナビ',
+    'DLsiteで人気の同人ゲーム・長編RPG・アクション作品を厳選してお届け。話題の新作ゲームを毎日更新！',
+    gameItems.length > 0 ? gameItems : items,
+    gameBreadcrumbs
+  );
+  fs.writeFileSync(path.join(gameDir, 'index.html'), gameHTML);
+
+  // 5. SEO用 sitemap.xml & robots.txt
   const sitemapXML = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -256,6 +301,16 @@ async function main() {
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>${DOMAIN}/manga/</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${DOMAIN}/game/</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>`;
   fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), sitemapXML);
 
@@ -263,9 +318,11 @@ async function main() {
 Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
-// 最新データをJSONとしても保存（Bluesky投稿などで参照用）
+
+  // 最新データをJSONとしても保存（Bluesky投稿などで参照用・main関数の内側に配置）
   fs.writeFileSync(path.join(publicDir, 'data.json'), JSON.stringify(items, null, 2));
 
-  console.log('ビルド完了: <meta name="referrer" content="no-referrer"> を追加し直リンクブロックを修正しました。');
+  console.log('ビルド完了: 全カテゴリページ（総合/ASMR/マンガ/ゲーム）とdata.jsonを出力しました。');
 }
+
 main();
