@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { BskyAgent } from '@atproto/api';
+import { BskyAgent, RichText } from '@atproto/api';
 
 const HANDLE = process.env.BLUESKY_HANDLE;
 const PASSWORD = process.env.BLUESKY_PASSWORD;
@@ -33,7 +33,7 @@ async function postToBluesky() {
     await agent.login({ identifier: HANDLE, password: PASSWORD });
     console.log('Blueskyログイン成功');
 
-    let imageEmbed = undefined;
+    let thumbBlob = undefined;
 
     // 画像URLが存在する場合、画像をダウンロードしてBlueskyへアップロード
     if (topItem.image && topItem.image.startsWith('http')) {
@@ -54,37 +54,38 @@ async function postToBluesky() {
             encoding: 'image/jpeg'
           });
 
-          imageEmbed = {
-            $type: 'app.bsky.embed.images',
-            images: [
-              {
-                alt: topItem.title,
-                image: uploadRes.data.blob
-              }
-            ]
-          };
-          console.log('画像のアップロード成功！');
+          thumbBlob = uploadRes.data.blob;
+          console.log('サムネイル画像のアップロード成功！');
         }
       } catch (imgError) {
-        console.error('画像アップロードに失敗（テキストのみで続行します）:', imgError);
+        console.error('画像アップロードに失敗（テキストカードのみで続行します）:', imgError);
       }
     }
 
-    // 直リンクではなく、自作サイトのURLへ誘導する本文を作成
-    const text = `【DLsite最新おすすめ作品】\n\n『${topItem.title}』\nサークル：${topItem.maker}\n価格：${topItem.price}\n\n👇最新の作品一覧・詳細はこちらから\n${SITE_URL}`;
+    // 1. 本文テキストを作成し、RichTextでURLを自動リンク化
+    const rawText = `【DLsite最新おすすめ作品】\n\n『${topItem.title}』\nサークル：${topItem.maker}\n価格：${topItem.price}\n\n👇最新の作品一覧・詳細はこちらから\n${SITE_URL}`;
+    const rt = new RichText({ text: rawText });
+    await rt.detectFacets(agent); // URLを検出して青文字リンク（facets）化
 
+    // 2. 「画像を押すとサイトに飛ぶ」外部リンクカード（embed.external）を作成
     const postPayload = {
-      text: text,
+      text: rt.text,
+      facets: rt.facets,
+      embed: {
+        $type: 'app.bsky.embed.external',
+        external: {
+          uri: SITE_URL,
+          title: `【最新】${topItem.title}`,
+          description: `サークル: ${topItem.maker} | 価格: ${topItem.price} - おすすめ同人作品まとめ`,
+          thumb: thumbBlob
+        }
+      },
       createdAt: new Date().toISOString()
     };
 
-    if (imageEmbed) {
-      postPayload.embed = imageEmbed;
-    }
-
     await agent.post(postPayload);
 
-    console.log(`Blueskyへのサイト誘導投稿完了: ${topItem.title}`);
+    console.log(`Blueskyへのサイト誘導（リンクカード化）投稿完了: ${topItem.title}`);
   } catch (error) {
     console.error('Bluesky投稿エラー:', error);
   }
