@@ -11,8 +11,8 @@
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f5f7fa; color: #333; margin: 0; padding: 0; line-height: 1.5; }
   header { background-color: #ffffff; padding: 20px; text-align: center; border-bottom: 1px solid #e1e8ed; }
   header h1 { margin: 0; font-size: 1.4rem; color: #1c2938; }
-  nav.categories { background-color: #2b3846; padding: 10px; text-align: center; }
-  nav.categories a { color: #ffffff; text-decoration: none; margin: 0 15px; font-weight: bold; font-size: 0.9rem; }
+  nav.categories { background-color: #2b3846; padding: 10px; text-align: center; flex-wrap: wrap; display: flex; justify-content: center; gap: 15px; }
+  nav.categories a { color: #ffffff; text-decoration: none; font-weight: bold; font-size: 0.9rem; }
   nav.categories a:hover { color: #1da1f2; text-decoration: underline; }
   .breadcrumb { max-width: 1200px; margin: 15px auto 0; padding: 0 20px; font-size: 0.85rem; color: #657786; }
   .breadcrumb a { color: #1da1f2; text-decoration: none; }
@@ -37,8 +37,11 @@
     <h1>DLsite 音声・ASMRおすすめまとめ | 毎日更新ナビ</h1>
   </header>
   <nav class="categories">
-    <a href="/">総合最新</a> | 
-    <a href="/asmr/">音声・ASMR特化</a>
+    <a href="/">総合最新</a>
+    <a href="/asmr/">音声・ASMR</a>
+    <a href="/manga/">マンガ・コミック</a>
+    <a href="/game/">ゲーム作品</a>
+    <a href="/cg/">CG集・イラスト</a>
   </nav>
 
   <div class="breadcrumb">
@@ -172,7 +175,13 @@
   </div>
 
   <footer>
-    <p><a href="/">トップページ</a> | <a href="/asmr/">音声・ASMR特化</a></p>
+    <p>
+      <a href="/">トップページ</a> | 
+      <a href="/asmr/">音声・ASMR</a> | 
+      <a href="/manga/">マンガ</a> | 
+      <a href="/game/">ゲーム</a> | 
+      <a href="/cg/">CG集</a>
+    </p>
     <p>&copy; 2026 DLsiteおすすめ作品まとめ</p>
   </footer>
 </body>
