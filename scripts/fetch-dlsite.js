@@ -59,7 +59,7 @@ async function fetchDLsiteData() {
         const cleanLink = rawLink.split('?')[0];
         const finalLink = `${cleanLink}?af_id=${affiliateId}`;
 
-        // RJ品番（例: RJ01234567 または RJ123456）を抽出
+        // RJ品番を抽出
         const rjMatch = cleanLink.match(/(RJ[0-9]+)/i);
         let imgUrl = '';
 
@@ -69,12 +69,10 @@ async function fetchDLsiteData() {
           let folder = '';
 
           if (digits.length >= 8) {
-            // 8桁の場合（例: RJ01001234 -> RJ01002000）
             const num = parseInt(digits, 10);
             const rounded = Math.ceil(num / 1000) * 1000;
             folder = 'RJ' + String(rounded).padStart(digits.length, '0');
           } else {
-            // 6桁の場合（例: RJ123456 -> RJ124000）
             const num = parseInt(digits, 10);
             const rounded = Math.ceil(num / 1000) * 1000;
             folder = 'RJ' + String(rounded).padStart(digits.length, '0');
@@ -120,7 +118,7 @@ async function fetchDLsiteData() {
   }
 }
 
-// 初期状態の青系デザインスタイル
+// 青系デザインスタイル
 const commonStyle = `
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f5f7fa; color: #333; margin: 0; padding: 0; line-height: 1.5; }
@@ -168,9 +166,10 @@ function generateHTML(title, description, items, breadcrumbs) {
   </header>
   <nav class="categories">
     <a href="/">総合最新</a>
-    <a href="/asmr/">音声・ASMR特化</a>
+    <a href="/asmr/">音声・ASMR</a>
     <a href="/manga/">マンガ・コミック</a>
-    <a href="/game/">ゲーム・CG</a>
+    <a href="/game/">ゲーム作品</a>
+    <a href="/cg/">CG集・イラスト</a>
   </nav>
 
   <div class="breadcrumb">
@@ -200,7 +199,8 @@ function generateHTML(title, description, items, breadcrumbs) {
       <a href="/">トップページ</a> | 
       <a href="/asmr/">音声・ASMR</a> | 
       <a href="/manga/">マンガ</a> | 
-      <a href="/game/">ゲーム</a>
+      <a href="/game/">ゲーム</a> | 
+      <a href="/cg/">CG集</a>
     </p>
     <p>&copy; 2026 DLsiteおすすめ作品まとめ</p>
   </footer>
@@ -220,75 +220,68 @@ async function main() {
   const asmrDir = path.join(publicDir, 'asmr');
   const mangaDir = path.join(publicDir, 'manga');
   const gameDir = path.join(publicDir, 'game');
+  const cgDir = path.join(publicDir, 'cg');
 
   if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
   if (!fs.existsSync(asmrDir)) fs.mkdirSync(asmrDir, { recursive: true });
   if (!fs.existsSync(mangaDir)) fs.mkdirSync(mangaDir, { recursive: true });
   if (!fs.existsSync(gameDir)) fs.mkdirSync(gameDir, { recursive: true });
+  if (!fs.existsSync(cgDir)) fs.mkdirSync(cgDir, { recursive: true });
 
   // 1. トップページ（総合）
-  const topBreadcrumbs = [{ name: 'ホーム', path: '/' }];
   const topHTML = generateHTML(
     'DLsiteおすすめ作品まとめ | 毎日更新ナビ',
     'DLsiteの最新人気作品を毎日自動更新でお届けします。全ジャンルの注目作品をチェック！',
     items,
-    topBreadcrumbs
+    [{ name: 'ホーム', path: '/' }]
   );
   fs.writeFileSync(path.join(publicDir, 'index.html'), topHTML);
 
-  // 2. ASMR・音声特化ページ
+  // 2. 音声・ASMR特化
   const asmrKeywords = ['ASMR', '音声', 'ボイス', '耳かき', '睡眠', '囁き', '耳攻め', '癒やし'];
-  const asmrItems = items.filter(item => 
-    asmrKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw))
-  );
-
-  const asmrBreadcrumbs = [
-    { name: 'ホーム', path: '/' },
-    { name: '音声・ASMR特化', path: '/asmr/' }
-  ];
+  const asmrItems = items.filter(item => asmrKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw)));
   const asmrHTML = generateHTML(
     'DLsite 音声・ASMRおすすめまとめ | 毎日更新ナビ',
     'DLsiteで人気のASMR・同人音声作品を厳選してお届け。安眠系・耳かき・シチュエーションボイスなど最新作品を毎日更新！',
     asmrItems.length > 0 ? asmrItems : items,
-    asmrBreadcrumbs
+    [{ name: 'ホーム', path: '/' }, { name: '音声・ASMR特化', path: '/asmr/' }]
   );
   fs.writeFileSync(path.join(asmrDir, 'index.html'), asmrHTML);
 
-  // 3. マンガ・コミック特化ページ
-  const mangaKeywords = ['CG', 'CG集', 'コミック', 'マンガ', '漫画', '同人誌', 'イラスト'];
-  const mangaItems = items.filter(item => 
-    mangaKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw))
-  );
-  const mangaBreadcrumbs = [
-    { name: 'ホーム', path: '/' },
-    { name: 'マンガ・コミック', path: '/manga/' }
-  ];
+  // 3. マンガ・コミック特化
+  const mangaKeywords = ['コミック', 'マンガ', '漫画', '同人誌', '単行本'];
+  const mangaItems = items.filter(item => mangaKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw)));
   const mangaHTML = generateHTML(
-    'DLsite 同人マンガ・CG集おすすめまとめ | 毎日更新ナビ',
-    'DLsiteで人気の同人マンガ・CG集・イラスト作品を厳選してお届け。話題の新作コミックを毎日更新！',
+    'DLsite 同人マンガおすすめまとめ | 毎日更新ナビ',
+    'DLsiteで人気の同人マンガ・コミック作品を厳選してお届け。話題の新作コミックを毎日更新！',
     mangaItems.length > 0 ? mangaItems : items,
-    mangaBreadcrumbs
+    [{ name: 'ホーム', path: '/' }, { name: 'マンガ・コミック', path: '/manga/' }]
   );
   fs.writeFileSync(path.join(mangaDir, 'index.html'), mangaHTML);
 
-  // 4. ゲーム・CG特化ページ
+  // 4. ゲーム特化
   const gameKeywords = ['ゲーム', 'RPG', 'ACT', 'SLG', 'ADV', 'ノベル', 'シミュレーション', '体験版'];
-  const gameItems = items.filter(item => 
-    gameKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw))
-  );
-  const gameBreadcrumbs = [
-    { name: 'ホーム', path: '/' },
-    { name: 'ゲーム・CG', path: '/game/' }
-  ];
+  const gameItems = items.filter(item => gameKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw)));
   const gameHTML = generateHTML(
     'DLsite 同人ゲームおすすめまとめ | 毎日更新ナビ',
     'DLsiteで人気の同人ゲーム・長編RPG・アクション作品を厳選してお届け。話題の新作ゲームを毎日更新！',
     gameItems.length > 0 ? gameItems : items,
-    gameBreadcrumbs
+    [{ name: 'ホーム', path: '/' }, { name: 'ゲーム作品', path: '/game/' }]
   );
   fs.writeFileSync(path.join(gameDir, 'index.html'), gameHTML);
 
-  // 5. SEO用 sitemap.xml & robots.txt
+  // 5. CG集・イラスト特化
+  const cgKeywords = ['CG', 'CG集', 'イラスト', '画集', '原画集'];
+  const cgItems = items.filter(item => cgKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw)));
+  const cgHTML = generateHTML(
+    'DLsite CG集・イラストおすすめまとめ | 毎日更新ナビ',
+    'DLsiteで人気のCG集・イラスト・画像作品を厳選してお届け。高画質CG集の新作を毎日更新！',
+    cgItems.length > 0 ? cgItems : items,
+    [{ name: 'ホーム', path: '/' }, { name: 'CG集・イラスト', path: '/cg/' }]
+  );
+  fs.writeFileSync(path.join(cgDir, 'index.html'), cgHTML);
+
+  // 6. SEO用 sitemap.xml & robots.txt
   const sitemapXML = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -311,6 +304,11 @@ async function main() {
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>${DOMAIN}/cg/</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>`;
   fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), sitemapXML);
 
@@ -319,10 +317,10 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  // 最新データをJSONとしても保存（Bluesky投稿などで参照用・main関数の内側に配置）
+  // 最新データをJSONとしても保存（main関数の内側に配置）
   fs.writeFileSync(path.join(publicDir, 'data.json'), JSON.stringify(items, null, 2));
 
-  console.log('ビルド完了: 全カテゴリページ（総合/ASMR/マンガ/ゲーム）とdata.jsonを出力しました。');
+  console.log('ビルド完了: 全5大カテゴリページ（総合/ASMR/マンガ/ゲーム/CG集）とsitemapを出力しました。');
 }
 
 main();
