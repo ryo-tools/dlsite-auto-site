@@ -266,5 +266,6 @@ Sitemap: ${DOMAIN}/sitemap.xml`;
 
   console.log('ビルド完了: <meta name="referrer" content="no-referrer"> を追加し直リンクブロックを修正しました。');
 }
-
+// 最新データをJSONとしても保存（Bluesky投稿などで参照用）
+  fs.writeFileSync(path.join(publicDir, 'data.json'), JSON.stringify(items, null, 2));
 main();
