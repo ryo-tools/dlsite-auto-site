@@ -50,31 +50,21 @@ async function fetchDLsiteData() {
         let rawLink = linkEl.getAttribute('href') || '';
         if (!rawLink) return;
 
-        if (rawLink.startsWith('/')) {
-          rawLink = 'https://www.dlsite.com' + rawLink;
-        } else if (!rawLink.startsWith('http')) {
-          rawLink = 'https://www.dlsite.com/' + rawLink;
-        }
+        // URL全体（エンコード文字列含む）からRJ番号を確実に抽出
+        const rjMatch = rawLink.match(/(RJ[0-9]+)/i);
+        if (!rjMatch) return; // RJ番号が存在しないリンクはスキップ
 
-        const cleanLink = rawLink.split('?')[0];
+        const rjCode = rjMatch[1].toUpperCase();
 
-        // RJ品番を抽出して dlaf.jp 公式アフィリエイトURLを生成
-        const rjMatch = cleanLink.match(/(RJ[0-9]+)/i);
-        const rjCode = rjMatch ? rjMatch[1].toUpperCase() : '';
+        // dlaf.jp 形式のアフィリエイトURLを確定生成
+        const finalLink = `https://dlaf.jp/home/dlaf/=/t/s/link/work/aid/${affiliateId}/id/${rjCode}.html`;
 
-        const finalLink = rjCode 
-          ? `https://dlaf.jp/maniax/dlaf/=/t/s/link/work/aid/${affiliateId}/id/${rjCode}.html`
-          : cleanLink;
-
-        let imgUrl = '';
-        if (rjMatch) {
-          const digits = rjCode.replace('RJ', '');
-          const num = parseInt(digits, 10);
-          const rounded = Math.ceil(num / 1000) * 1000;
-          const folder = 'RJ' + String(rounded).padStart(digits.length, '0');
-
-          imgUrl = `https://img.dlsite.jp/modpub/images2/work/doujin/${folder}/${rjCode}_img_main.jpg`;
-        }
+        // 画像URL構築
+        const digits = rjCode.replace('RJ', '');
+        const num = parseInt(digits, 10);
+        const rounded = Math.ceil(num / 1000) * 1000;
+        const folder = 'RJ' + String(rounded).padStart(digits.length, '0');
+        const imgUrl = `https://img.dlsite.jp/modpub/images2/work/doujin/${folder}/${rjCode}_img_main.jpg`;
 
         const container = linkEl.closest('tr') || linkEl.closest('.work_thumb_box') || linkEl.closest('li') || linkEl.parentElement.parentElement;
 
@@ -93,7 +83,7 @@ async function fetchDLsiteData() {
           list.push({
             title: titleText,
             link: finalLink,
-            rawLink: cleanLink,
+            rawLink: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
             maker: maker,
             image: imgUrl || 'https://www.dlsite.com/images/web/common/no_image/no_image_200x200.gif',
             price: price
@@ -316,7 +306,7 @@ Sitemap: ${DOMAIN}/sitemap.xml`;
   // 最新データをJSONとしても保存
   fs.writeFileSync(path.join(publicDir, 'data.json'), JSON.stringify(items, null, 2));
 
-  console.log('ビルド完了: 正しいdlaf.jp形式のアフィリエイトURLで全5大カテゴリページとsitemapを出力しました。');
+  console.log('ビルド完了: dlaf.jp形式（RJ抽出確定ロジック）で生成完了。');
 }
 
 main();
