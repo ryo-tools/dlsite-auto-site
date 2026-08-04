@@ -58,22 +58,20 @@ async function fetchDLsiteData() {
 
         const cleanLink = rawLink.split('?')[0];
 
-        // ⭕ 正しいDLsiteアフィリエイトURL（dlink形式）の構築
-        const encodedUrl = encodeURIComponent(cleanLink);
-        const finalLink = `https://www.dlsite.com/home/dlink/=/aid/${affiliateId}/url/${encodedUrl}`;
-
-        // RJ品番を抽出
+        // RJ品番を抽出して dlaf.jp 公式アフィリエイトURLを生成
         const rjMatch = cleanLink.match(/(RJ[0-9]+)/i);
+        const rjCode = rjMatch ? rjMatch[1].toUpperCase() : '';
+
+        const finalLink = rjCode 
+          ? `https://dlaf.jp/maniax/dlaf/=/t/s/link/work/aid/${affiliateId}/id/${rjCode}.html`
+          : cleanLink;
+
         let imgUrl = '';
-
         if (rjMatch) {
-          const rjCode = rjMatch[1].toUpperCase();
           const digits = rjCode.replace('RJ', '');
-          let folder = '';
-
           const num = parseInt(digits, 10);
           const rounded = Math.ceil(num / 1000) * 1000;
-          folder = 'RJ' + String(rounded).padStart(digits.length, '0');
+          const folder = 'RJ' + String(rounded).padStart(digits.length, '0');
 
           imgUrl = `https://img.dlsite.jp/modpub/images2/work/doujin/${folder}/${rjCode}_img_main.jpg`;
         }
@@ -318,7 +316,7 @@ Sitemap: ${DOMAIN}/sitemap.xml`;
   // 最新データをJSONとしても保存
   fs.writeFileSync(path.join(publicDir, 'data.json'), JSON.stringify(items, null, 2));
 
-  console.log('ビルド完了: 正しいアフィリエイトURLで全5大カテゴリページとsitemapを出力しました。');
+  console.log('ビルド完了: 正しいdlaf.jp形式のアフィリエイトURLで全5大カテゴリページとsitemapを出力しました。');
 }
 
 main();
