@@ -24,14 +24,17 @@ async function postToBluesky() {
     return;
   }
 
-  // ASMR・音声作品に絞り込む
+  // ASMR・音声作品に絞り込み
   const asmrKeywords = ['ASMR', '音声', 'ボイス', '耳かき', '睡眠', '囁き', '耳攻め', '癒やし', 'バイノーラル', 'シチュエーション'];
   const asmrItems = items.filter(item => 
     asmrKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw))
   );
 
-  // ASMR作品が見つかればその1番目、なければ全体の1番目を取得
-  const topItem = asmrItems.length > 0 ? asmrItems[0] : items[0];
+  const targetPool = asmrItems.length > 0 ? asmrItems : items;
+
+  // 1. 固定連投を防ぐため、対象作品の中からランダム選定
+  const randomIndex = Math.floor(Math.random() * targetPool.length);
+  const topItem = targetPool[randomIndex];
 
   const agent = new BskyAgent({ service: 'https://bsky.social' });
 
@@ -41,7 +44,7 @@ async function postToBluesky() {
 
     let thumbBlob = undefined;
 
-    // 画像URLが存在する場合、画像をダウンロードしてBlueskyへアップロード
+    // サムネイル画像のアップロード
     if (topItem.image && topItem.image.startsWith('http')) {
       try {
         console.log(`画像をダウンロード中: ${topItem.image}`);
@@ -68,12 +71,25 @@ async function postToBluesky() {
       }
     }
 
-    // 1. 本文テキストを作成し、RichTextでURLを自動リンク化
-    const rawText = `【DLsite最新おすすめASMR】\n\n『${topItem.title}』\nサークル：${topItem.maker}\n価格：${topItem.price}\n\n👇最新のASMR作品一覧・詳細はこちらから\n${SITE_URL}`;
-    const rt = new RichText({ text: rawText });
-    await rt.detectFacets(agent); // URLを検出して青文字リンク（facets）化
+    // 2. クリック率を高めるキャッチコピーのランダム付与
+    const hooks = [
+      '🎧【おすすめASMR】今夜の安眠・作業用に',
+      '✨【注目作品】話題のDLsite音声・ASMR',
+      '🌙【耳元ボイス】極上の癒やし体験ピックアップ',
+      '🔥【最新セール・新作】おすすめ同人ASMR'
+    ];
+    const selectedHook = hooks[Math.floor(Math.random() * hooks.length)];
 
-    // 2. 「画像を押すとサイトに飛ぶ」外部リンクカード（embed.external）とセルフラベルを設定
+    // タイトルの長さを調整（文字数オーバー防止）
+    const displayTitle = topItem.title.length > 40 ? topItem.title.substring(0, 37) + '...' : topItem.title;
+
+    // 本文テキスト構築（自サイトへ誘導）
+    const rawText = `${selectedHook}\n\n『${displayTitle}』\nサークル：${topItem.maker}\n価格：${topItem.price}\n\n👇試聴・詳細・作品一覧はこちら\n${SITE_URL}`;
+    
+    const rt = new RichText({ text: rawText });
+    await rt.detectFacets(agent);
+
+    // 3. 外部リンクカード設定
     const postPayload = {
       text: rt.text,
       facets: rt.facets,
@@ -81,7 +97,7 @@ async function postToBluesky() {
         $type: 'app.bsky.embed.external',
         external: {
           uri: SITE_URL,
-          title: `【最新ASMR】${topItem.title}`,
+          title: `【ASMR】${displayTitle}`,
           description: `サークル: ${topItem.maker} | 価格: ${topItem.price} - DLsiteおすすめASMR・同人音声まとめ`,
           thumb: thumbBlob
         }

@@ -57,7 +57,10 @@ async function fetchDLsiteData() {
         }
 
         const cleanLink = rawLink.split('?')[0];
-        const finalLink = `${cleanLink}?af_id=${affiliateId}`;
+
+        // ⭕ 正しいDLsiteアフィリエイトURL（dlink形式）の構築
+        const encodedUrl = encodeURIComponent(cleanLink);
+        const finalLink = `https://www.dlsite.com/home/dlink/=/aid/${affiliateId}/url/${encodedUrl}`;
 
         // RJ品番を抽出
         const rjMatch = cleanLink.match(/(RJ[0-9]+)/i);
@@ -68,15 +71,9 @@ async function fetchDLsiteData() {
           const digits = rjCode.replace('RJ', '');
           let folder = '';
 
-          if (digits.length >= 8) {
-            const num = parseInt(digits, 10);
-            const rounded = Math.ceil(num / 1000) * 1000;
-            folder = 'RJ' + String(rounded).padStart(digits.length, '0');
-          } else {
-            const num = parseInt(digits, 10);
-            const rounded = Math.ceil(num / 1000) * 1000;
-            folder = 'RJ' + String(rounded).padStart(digits.length, '0');
-          }
+          const num = parseInt(digits, 10);
+          const rounded = Math.ceil(num / 1000) * 1000;
+          folder = 'RJ' + String(rounded).padStart(digits.length, '0');
 
           imgUrl = `https://img.dlsite.jp/modpub/images2/work/doujin/${folder}/${rjCode}_img_main.jpg`;
         }
@@ -98,6 +95,7 @@ async function fetchDLsiteData() {
           list.push({
             title: titleText,
             link: finalLink,
+            rawLink: cleanLink,
             maker: maker,
             image: imgUrl || 'https://www.dlsite.com/images/web/common/no_image/no_image_200x200.gif',
             price: price
@@ -317,10 +315,10 @@ Allow: /
 Sitemap: ${DOMAIN}/sitemap.xml`;
   fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt);
 
-  // 最新データをJSONとしても保存（main関数の内側に配置）
+  // 最新データをJSONとしても保存
   fs.writeFileSync(path.join(publicDir, 'data.json'), JSON.stringify(items, null, 2));
 
-  console.log('ビルド完了: 全5大カテゴリページ（総合/ASMR/マンガ/ゲーム/CG集）とsitemapを出力しました。');
+  console.log('ビルド完了: 正しいアフィリエイトURLで全5大カテゴリページとsitemapを出力しました。');
 }
 
 main();
