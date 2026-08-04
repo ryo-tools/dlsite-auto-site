@@ -50,9 +50,9 @@ async function fetchDLsiteData() {
         let rawLink = linkEl.getAttribute('href') || '';
         if (!rawLink) return;
 
-        // URL全体（エンコード文字列含む）からRJ番号を確実に抽出
+        // URL全体からRJ番号を確実に抽出
         const rjMatch = rawLink.match(/(RJ[0-9]+)/i);
-        if (!rjMatch) return; // RJ番号が存在しないリンクはスキップ
+        if (!rjMatch) return;
 
         const rjCode = rjMatch[1].toUpperCase();
 
@@ -70,6 +70,7 @@ async function fetchDLsiteData() {
 
         let maker = 'DLsite';
         let price = '価格情報なし';
+        let workType = '';
 
         if (container) {
           const makerEl = container.querySelector('.maker_name a, .author a, .maker a');
@@ -77,6 +78,10 @@ async function fetchDLsiteData() {
 
           const priceEl = container.querySelector('.price, .work_price, .price_default');
           if (priceEl) price = priceEl.innerText.trim();
+
+          // DLsiteの作品種別タグ/アイコン要素を取得（.work_category, .work_genre, .work_type, アイコン等）
+          const typeEl = container.querySelector('.work_category, .work_genre, .work_type, .work_img_icon span, .icon_work_type');
+          if (typeEl) workType = typeEl.innerText.trim();
         }
 
         if (!list.some(i => i.link === finalLink)) {
@@ -86,7 +91,8 @@ async function fetchDLsiteData() {
             rawLink: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
             maker: maker,
             image: imgUrl || 'https://www.dlsite.com/images/web/common/no_image/no_image_200x200.gif',
-            price: price
+            price: price,
+            workType: workType
           });
         }
       });
@@ -223,9 +229,11 @@ async function main() {
   );
   fs.writeFileSync(path.join(publicDir, 'index.html'), topHTML);
 
-  // 2. 音声・ASMR特化
-  const asmrKeywords = ['ASMR', '音声', 'ボイス', '耳かき', '睡眠', '囁き', '耳攻め', '癒やし'];
-  const asmrItems = items.filter(item => asmrKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw)));
+  // 2. 音声・ASMR特化（DLsite公式形式：ボイス・ASMR, ボイス, 音楽, 朗読等）
+  const asmrKeywords = ['ボイス・ASMR', 'ボイス', 'ASMR', '音声', '耳かき', '睡眠', '囁き', '耳攻め', '癒やし', 'バイノーラル', '朗読', 'ドラマ', 'シチュエーション', 'ボイスドラマ', '音楽'];
+  const asmrItems = items.filter(item => 
+    asmrKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw) || item.workType.includes(kw))
+  );
   const asmrHTML = generateHTML(
     'DLsite 音声・ASMRおすすめまとめ | 毎日更新ナビ',
     'DLsiteで人気のASMR・同人音声作品を厳選してお届け。安眠系・耳かき・シチュエーションボイスなど最新作品を毎日更新！',
@@ -234,9 +242,11 @@ async function main() {
   );
   fs.writeFileSync(path.join(asmrDir, 'index.html'), asmrHTML);
 
-  // 3. マンガ・コミック特化
-  const mangaKeywords = ['コミック', 'マンガ', '漫画', '同人誌', '単行本'];
-  const mangaItems = items.filter(item => mangaKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw)));
+  // 3. マンガ・コミック特化（DLsite公式形式：マンガ, コミック, 劇画等）
+  const mangaKeywords = ['マンガ', 'コミック', '漫画', '同人誌', '単行本', '総集編', '劇画', 'フルカラー', 'カラー', '描き下ろし'];
+  const mangaItems = items.filter(item => 
+    mangaKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw) || item.workType.includes(kw))
+  );
   const mangaHTML = generateHTML(
     'DLsite 同人マンガおすすめまとめ | 毎日更新ナビ',
     'DLsiteで人気の同人マンガ・コミック作品を厳選してお届け。話題の新作コミックを毎日更新！',
@@ -245,9 +255,11 @@ async function main() {
   );
   fs.writeFileSync(path.join(mangaDir, 'index.html'), mangaHTML);
 
-  // 4. ゲーム特化
-  const gameKeywords = ['ゲーム', 'RPG', 'ACT', 'SLG', 'ADV', 'ノベル', 'シミュレーション', '体験版'];
-  const gameItems = items.filter(item => gameKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw)));
+  // 4. ゲーム特化（DLsite公式形式：ゲーム, ロールプレイング, アクション, アドベンチャー等）
+  const gameKeywords = ['ゲーム', 'ロールプレイング', 'アクション', 'アドベンチャー', 'シミュレーション', 'RPG', 'ACT', 'SLG', 'ADV', 'ノベル', '体験版', 'STG', 'パズル', 'ハクスラ', '3D', '2D', 'ダンジョン', '脱出', '育成', '同人ゲーム'];
+  const gameItems = items.filter(item => 
+    gameKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw) || item.workType.includes(kw))
+  );
   const gameHTML = generateHTML(
     'DLsite 同人ゲームおすすめまとめ | 毎日更新ナビ',
     'DLsiteで人気の同人ゲーム・長編RPG・アクション作品を厳選してお届け。話題の新作ゲームを毎日更新！',
@@ -256,9 +268,11 @@ async function main() {
   );
   fs.writeFileSync(path.join(gameDir, 'index.html'), gameHTML);
 
-  // 5. CG集・イラスト特化
-  const cgKeywords = ['CG', 'CG集', 'イラスト', '画集', '原画集'];
-  const cgItems = items.filter(item => cgKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw)));
+  // 5. CG集・イラスト特化（DLsite公式形式：CG・イラスト, CG集等）
+  const cgKeywords = ['CG・イラスト', 'CG集', 'CG', 'イラスト', '画集', '原画集', '立ち絵', '素材', '差分'];
+  const cgItems = items.filter(item => 
+    cgKeywords.some(kw => item.title.includes(kw) || item.maker.includes(kw) || item.workType.includes(kw))
+  );
   const cgHTML = generateHTML(
     'DLsite CG集・イラストおすすめまとめ | 毎日更新ナビ',
     'DLsiteで人気のCG集・イラスト・画像作品を厳選してお届け。高画質CG集の新作を毎日更新！',
@@ -306,7 +320,7 @@ Sitemap: ${DOMAIN}/sitemap.xml`;
   // 最新データをJSONとしても保存
   fs.writeFileSync(path.join(publicDir, 'data.json'), JSON.stringify(items, null, 2));
 
-  console.log('ビルド完了: dlaf.jp形式（RJ抽出確定ロジック）で生成完了。');
+  console.log('ビルド完了: DLsite公式形式名対応でカテゴリ振り分け精度を向上。');
 }
 
 main();
