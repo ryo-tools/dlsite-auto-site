@@ -44,3 +44,20 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto update DLsite SEO content [skip ci]" && git pull --rebase origin main && git push origin main)
+
+      - name: Notify Discord for X Post Stock
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          # 成果物（latest_item.json等）があればそこから取得し、無ければ通知用ダミー/スクリプトを読み出す処理
+          if [ -f scripts/notify-discord.js ]; then
+            node scripts/notify-discord.js
+          else
+            curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d '{
+                   "content": "【X予約投稿用ストック】\nサイト更新が完了しました！\nDiscordから最新情報をコピーしてXに予約投稿してください。\n\n**■ 親ツイート用（コピペ）**\n夜ふかしのお供にぴったりのDLsite注目作を紹介！\n耳元で聞こえる音と世界観に癒やされます…🎧\n\n#DLsite #ASMR\n👇作品の詳細・レビューはリプライ欄へ\n\n-------------------\n**■ リプライ用URL**\nhttps://dlsite-auto-site.pages.dev"
+                 }' \
+                 $DISCORD_WEBHOOK_URL
+          fi
