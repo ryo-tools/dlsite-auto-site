@@ -103,7 +103,7 @@ async function postToBluesky() {
         }
       },
       labels: {
-        $type: 'com.atproto.label.defs.selfLabels',
+        $type: 'com.atproto.label.defs#selfLabels',
         values: [
           { val: 'sexual' }
         ]
