@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 
+// 亮さんのサイトトップページURL
+const BASE_SITE_URL = 'https://dlsite-auto-site.pages.dev/';
+
 async function sendDiscordNotification() {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
   if (!webhookUrl) {
@@ -23,29 +26,30 @@ async function sendDiscordNotification() {
       process.exit(0);
     }
 
-    // 先頭の1件（最新作品）をピックアップ
-    const item = items[0];
+    // 全データからランダムに1件を抽出
+    const randomIndex = Math.floor(Math.random() * items.length);
+    const item = items[randomIndex];
 
     // ジャンルに応じたハッシュタグの設定
     let hashtag = '#DLsite';
-    if (item.workType.includes('ボイス') || item.workType.includes('ASMR')) {
+    if (item.workType && (item.workType.includes('ボイス') || item.workType.includes('ASMR'))) {
       hashtag += ' #ASMR #音声作品';
-    } else if (item.workType.includes('マンガ') || item.workType.includes('コミック')) {
+    } else if (item.workType && (item.workType.includes('マンガ') || item.workType.includes('コミック'))) {
       hashtag += ' #同人誌 #マンガ';
-    } else if (item.workType.includes('ゲーム')) {
+    } else if (item.workType && item.workType.includes('ゲーム')) {
       hashtag += ' #同人ゲーム';
     }
 
     const title = "【X予約投稿用ストック】";
-    const body = `${item.title}\nサークル: ${item.maker} (${item.price})\n\nおすすめの注目作品をピックアップ！夜のお供にぜひチェックしてみてください。🎧\n\n${hashtag}\n👇作品の詳細・レビューはリプライ欄へ`;
-    const replyUrl = item.link;
+    const body = `${item.title}\nサークル: ${item.maker || '不明'} (${item.price || ''})\n\nおすすめの注目作品をピックアップ！夜のお供にぜひチェックしてみてください。🎧\n\n${hashtag}\n👇作品の詳細・レビューはリプライ欄へ`;
     const imageUrl = item.image;
 
     const payload = {
-      content: `${title}\n\n**■ 親ツイート用（コピペ）**\n${body}\n\n-------------------\n**■ リプライ用URL**\n${replyUrl}`,
+      content: `${title}\n\n**■ 親ツイート用（コピペ）**\n${body}\n\n-------------------\n**■ リプライ用URL（自サイト導線）**\n${BASE_SITE_URL}`,
       embeds: [
         {
           title: item.title,
+          url: BASE_SITE_URL, // クリック時も確実に自社サイトへ遷移
           image: {
             url: imageUrl
           }
@@ -64,7 +68,7 @@ async function sendDiscordNotification() {
     if (!response.ok) {
       console.error('Discord送信失敗:', response.statusText);
     } else {
-      console.log('画像付きでDiscordへの通知が完了しました！');
+      console.log(`ランダム通知完了: [${item.title}] -> 誘導先: ${BASE_SITE_URL}`);
     }
   } catch (error) {
     console.error('Discord通知エラー:', error);
